@@ -5,6 +5,10 @@
     <script src="//code.jquery.com/jquery-1.10.2.min.js"></script>
     <script src="http://download.tsi.telecom-paristech.fr/gpac/mp4box.js/mp4box.all.min.js"></script>
     <script src="http://download.tsi.telecom-paristech.fr/gpac/mp4box.js/downloader.js"></script>
+    <!--
+    <script src="../mp4box.all.js"></script>
+    <script src="../downloader.js"></script>
+    -->
   </head>
   <body>
     <h1>mp4cut.js -- JS/clientside based clipping of an .mp4 file - rewrites header and only (losslessly) sends desired A/V packets for the desired start/end range</h1>
@@ -12,7 +16,7 @@
     <b>(soon to) uses the Media Source API</b><br/>
     <a href="https://hacks.mozilla.org/2015/07/streaming-media-on-demand-with-media-source-extensions/">https://hacks.mozilla.org/2015/07/streaming-media-on-demand-with-media-source-extensions/</a><br/>
     to inject video to this tag:<br/>
-    <video controls autoplay width="160" height="120"></video><br/>
+    <video controls autoplay width="320" height="240"></video><br/>
     <b style="color:red">tracey fixme: now try to rewrite header of c.mp4 and then append header and 10+ seconds into video into a new mediasource element into the empty video tag above!  if THAT works -- then see if can do DASH style MOOF creation on IA video...  this needs to be using "serve-dir" alias for RANGE requests, BTW!</b><br/>
 
     <hr/>
@@ -28,23 +32,47 @@
  grunt;
  */
 
- var FI='http://ia800301.us.archive.org/~tracey/cors_get.php?path=/27/items/stairs/stairs.mp4';
+ var FI='http://ia600301.us.archive.org/~tracey/cors_get.php?path=/27/items/stairs/stairs.mp4';
 
  // sudo apt-get install gpac;
  // wget wget archive.org/download/commute/commute.mp4;
+ // wget wget archive.org/download/commute/commute.avi;
  // MP4Box -dash 10000 -rap -frag-rap commute.mp4
+ // ffmpeg -y -i commute.avi   -movflags +frag_keyframe+empty_moov  commute-frag.mp4 
  // cp commute.mp4  commute-ms.mp4;
  FI='commute_dashinit.mp4'; // but this has no keyframes STSS for trimming!
- FI='commute.mp4';    // currently header is incompatible with MediaSource (prior one is compatible)
+//FI='commute.mp4';    // currently header is incompatible with MediaSource (prior one is compatible)
+// FI='../commute-frag.mp4'; // but this has no keyframes STSS for trimming!
  var START=10;
  var END=20;
  var FETCH_ENTIRE_FILE=false;
+ var fragment=false;
+
+ var mimeCodec = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
+ window.mediaSource = new MediaSource();
+ mediaSource.append = function(buffer){ // NOTE: tracey added function
+   if (!mediaSource.started){
+     mediaSource.started = true;//NOTE: this is *us* extending the object
+     var video = document.querySelector('video');
+     video.src = URL.createObjectURL(mediaSource);
+     mediaSource.addEventListener('sourceopen', function(){
+       log('mediaSource sourceopen()');
+       mediaSource.sourceBuffer = mediaSource.addSourceBuffer(mimeCodec);//NOTE: this is *us* extending the object   
+       mediaSource.sourceBuffer.appendBuffer(buffer);
+     });
+   }
+   else {
+     mediaSource.sourceBuffer.appendBuffer(buffer);
+   }
+ };
+ 
  
  //FI='COMW_20130726_023000_The_Daily_Show_With_Jon_Stewart.mp4';
  //START=1207;
  //END=START + 30;
 
- //Log.setLogLevel(Log.debug);
+//Log.setLogLevel(Log.debug);
+Log.setLogLevel(Log.info);
 
  var log=function(){
    for (arg in arguments)
@@ -66,8 +94,43 @@
    log("onReady info:");
    log(info);
 
- //log("SEEK ME"); log(mp4box.seek(10, true)); return;//xxxxxxxxxx
- 
+
+   if (fragment){
+     mp4box.onSegment = function (id, user, buffer) {
+       log("Received segment on track "+id+" for object "+user+" with a length of "+buffer.byteLength);
+     }
+     
+     for (var trak in mp4box.getInfo().tracks){
+       mp4box.setSegmentOptions(mp4box.getInfo().tracks[trak].id, "xxxx"/*{sb:mediaSource.sourceBuffer}*/,  {rapAlignment:true});
+       log('setseg on trak:'+trak+', id:'+mp4box.getInfo().tracks[trak].id);
+     }
+     
+     /*
+     // mp4box.createSingleSampleMoof  ?? xxxx
+     mp4box.createFragment('xxx ignored??',
+                           1, //track_id
+                           3 //sampleNumber
+     );
+      */
+
+     mp4box.xxxseg = mp4box.initializeSegmentation();
+     mp4box.start();
+
+     log('fragmentedTracks:');
+     log(mp4box.fragmentedTracks);
+     //mediaSource.append(mp4box.writeFile()); //xxxxxxxx
+     //mediaSource.append(mp4box.xxxseg[0].buffer); //xxxxxxxx
+     //mediaSource.append(mp4box.xxxseg[1].buffer); //xxxxxxxx
+     
+     log('what the frag?');
+     return;
+   }
+   
+   
+//log("SEEK ME"); log(mp4box.seek(10, true)); return;//xxxxxxxxxx
+   mediaSource.append(mp4box.writeFile()); return; //xxxxxxxx
+     
+   
    mp4box.stop();//xxxx no work?
    
    var stts_get_duration = function(stts){
@@ -125,7 +188,7 @@
        var sample_numbers=moov.traks[trak].mdia.minf.stbl.stss.sample_numbers;
        for (var i in sample_numbers){
          // pts:  179*100/2997 ==> 5.972639305972639
-         var pts=(sample_numbers[i]-1) * duration / trak_time_scale;//xxx check the -1 mathg, etc.
+         var pts=(sample_numbers[i]-1) * duration / trak_time_scale;//xxx check the -1 math, etc.
          if (pts <= START){
            nearestKeyframeTrak = trak;
            nearestKeyframe = sample_numbers[i];
@@ -313,29 +376,18 @@
    //moov_shift_offsets_inplace(moov, offset);//xxx
    //create_traffic_shaping(moov, ... //xxx ??!
    
-   return; //xxx dont try below??
 
-
-
-   mp4box.onSegment = function (id, user, buffer) {
-     log("Received segment on track "+id+" for object "+user+" with a length of "+buffer.byteLength);
-   }
-
-   
-   // mp4box.createSingleSampleMoof  ?? xxxx
-   mp4box.createFragment('xxx ignored??',
-                         1, //track_id
-                         3 //sampleNumber
-   );
 
  };//end mp4box.onReady..
 
 
+ 
+ 
 
 
  var downloader = new Downloader();
  downloader.setInterval(100);
- downloader.setChunkSize(200000);
+ downloader.setChunkSize(2000000);
  downloader.setUrl(FI);
  downloader.start();
 
@@ -344,11 +396,14 @@
      log('DL callback()');
      log('end: '+end);
      var nextStart = 0;
-     if (response)
+     if (response){
        nextStart = mp4box.appendBuffer(response);
-
+       //mediaSource.append(response);
+     }
+     
      if (end){
        mp4box.flush();
+//mediaSource.append(mp4box.writeFile()); //xxxxxxxx
      }
      else {
        if (!FETCH_ENTIRE_FILE  &&  mp4box.readySent)
