@@ -42,18 +42,17 @@ function initializeAllSourceBuffers(info) {
 			var track = info.tracks[i];
       log("addbuffer() now for track "+i);
 			addBuffer(video, track);
-			//var checkBox = document.getElementById("addTrack"+track.id);
-			//checkBox.checked = true;
 		}
-		initializeSourceBuffers2(info);
+		initializeSourceBuffers(info);
 	}
 }
 
 
-function initializeSourceBuffers2(info) {
-
+function initializeSourceBuffers(info) {
+  log('initializeSourceBuffers() finally');
+  
   mediaSource.duration = info.duration/info.timescale; //xxx
-  debugger;
+  
   
 	var initSegs = mp4box.initializeSegmentation();
 	for (var i = 0; i < initSegs.length; i++) {
@@ -149,38 +148,6 @@ function addBuffer(video, mp4track) {
 		}
 	} else {
 		Log.warn("MSE", "MIME type '"+mime+"' not supported for creation of a SourceBuffer for track id "+track_id);
-		var trackType;
-		var i;
-		var foundTextTrack = false;
-		if (codec == "wvtt" && !kind.schemeURI.startsWith("urn:gpac:")) {
-			trackType = "subtitles";
-		} else {
-			trackType = "metadata";
-		}
-		for (i = 0; i < video.textTracks.length; i++) {
-			var track = video.textTracks[i];
-			if (track.label === 'track_'+track_id) {
-				track.mode = "showing";
-				track.div.style.display = 'inline';
-				foundTextTrack = true;
-				break;
-			}
-		}
-		if (!foundTextTrack) {
-			var texttrack = video.addTextTrack(trackType, "track_"+track_id);
-			texttrack.mode = "showing";
-			mp4box.setExtractionOptions(track_id, texttrack, { nbSamples: parseInt(extractionSizeLabel.value) });
-			texttrack.codec = codec;
-			texttrack.mime = codec.substring(codec.indexOf('.')+1);
-			texttrack.mp4kind = mp4track.kind;
-			texttrack.track_id = track_id;
-			var div = document.createElement("div");
-			div.id = "overlay_track_"+track_id;
-			div.setAttribute("class", "overlay");
-			overlayTracks.appendChild(div);
-			texttrack.div = div;
-			initTrackViewer(texttrack);
-		}
 	}
 }
 
@@ -222,61 +189,21 @@ mp4box.onError = function(e) {
 mp4box.onReady = function(info) {
   log("onReady info:");
   log(info);
-  initializeAllSourceBuffers(info);  
+	if (mediaSource.readyState === "open")
+    initializeAllSourceBuffers(info);
+  else
+    setTimeout(function(){ initializeAllSourceBuffers(info); }, 1000);//xxxx
 };
 
  
 
 mp4box.onSegment = function (id, user, buffer, sampleNum) {	//xxxxx
-		var sb = user;
-		sb.segmentIndex++;
-		sb.pendingAppends.push({ id: id, buffer: buffer, sampleNum: sampleNum });
-		Log.info("Application","Received new segment for track "+id+" up to sample #"+sampleNum+", segments pending append: "+sb.pendingAppends.length);
-		onUpdateEnd.call(sb, true, false);
+	var sb = user;
+	sb.segmentIndex++;
+	sb.pendingAppends.push({ id: id, buffer: buffer, sampleNum: sampleNum });
+	Log.info("Application","Received new segment for track "+id+" up to sample #"+sampleNum+", segments pending append: "+sb.pendingAppends.length);
+	onUpdateEnd.call(sb, true, false);
 };
-mp4box.onSamples = function (id, user, samples) {//xxxx
-		var sampleParser;
-		var cue;	
-		var texttrack = user;
-		Log.info("TextTrack #"+id,"Received "+samples.length+" new sample(s)");
-		for (var j = 0; j < samples.length; j++) {
-			var sample = samples[j];
-			if (sample.description.type === "wvtt") {
-				sampleParser = new VTTin4Parser();
-				cues = sampleParser.parseSample(sample.data);
-				for (var i = 0; i < cues.length; i++) {
-					var cueIn4 = cues[i];
-					cue = new VTTCue(sample.dts/sample.timescale, (sample.dts+sample.duration)/sample.timescale, (cueIn4.payl ? cueIn4.payl.text : ""));
-					texttrack.addCue(cue);
-				}
-			} else if (sample.description.type === "metx" || sample.description.type === "stpp") {
-				sampleParser = new XMLSubtitlein4Parser();
-				var xmlSubSample = sampleParser.parseSample(sample); 
-				console.log("Parsed XML sample at time "+Log.getDurationString(sample.dts,sample.timescale)+" :", xmlSubSample.document);
-				cue = new VTTCue(sample.dts/sample.timescale, (sample.dts+sample.duration)/sample.timescale, xmlSubSample.documentString);
-				texttrack.addCue(cue);
-				cue.is_rap = sample.is_rap;
-				cue.onenter = processInbandCue;
-			} else if (sample.description.type === "mett" || sample.description.type === "sbtt" || sample.description.type === "stxt") {
-				sampleParser = new Textin4Parser();
-				if (sample.description.txtC && j===0) {
-					if (sample.description.txtC.config) {
-					} else {
-						sample.description.txtC.config = sampleParser.parseConfig(sample.description.txtC.data); 
-					}
-					console.log("Parser Configuration: ", sample.description.txtC.config);
-					texttrack.config = sample.description.txtC.config;
-				}
-				var textSample = sampleParser.parseSample(sample); 
-				console.log("Parsed text sample at time "+Log.getDurationString(sample.dts,sample.timescale)+" :", textSample);
-				cue = new VTTCue(sample.dts/sample.timescale, (sample.dts+sample.duration)/sample.timescale, textSample);
-				texttrack.addCue(cue);
-				cue.is_rap = sample.is_rap;
-				cue.onenter = processInbandCue;
-			}
-		}
-};
-
 
 
 
