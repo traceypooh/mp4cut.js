@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>mp4cut.js -- JS/clientside based clipping of an .mp4 file - rewrites header and only (losslessly) sends desired A/V packets for the desired start/end range</title>
+    <script src="//code.jquery.com/jquery-1.10.2.min.js"></script>
+    <!--
+    <script src="http://download.tsi.telecom-paristech.fr/gpac/mp4box.js/mp4box.all.min.js"></script>
+    <script src="http://download.tsi.telecom-paristech.fr/gpac/mp4box.js/downloader.js"></script>
+    -->
+    <script src="../mp4box.all.js"></script>
+    <script src="../downloader.js"></script>
+  </head>
+  <body>
+    <h1>mp4cut.js -- JS/clientside based clipping of an .mp4 file - rewrites header and only (losslessly) sends desired A/V packets for the desired start/end range</h1>
+    Uses mp4/moov parsing JS from <a href="http://download.tsi.telecom-paristech.fr/gpac/mp4box.js/">mp4box.js</a><br/>
+    <b>(soon to) uses the Media Source API</b><br/>
+    <a href="https://hacks.mozilla.org/2015/07/streaming-media-on-demand-with-media-source-extensions/">https://hacks.mozilla.org/2015/07/streaming-media-on-demand-with-media-source-extensions/</a><br/>
+    to inject video to this tag:<br/>
+    <video id="vxxx" controls autoplay width="320" height="240"></video><br/>
+    <b style="color:red">tracey fixme: now try to rewrite header of c.mp4 and then append header and 10+ seconds into video into a new mediasource element into the empty video tag above!  if THAT works -- then see if can do DASH style MOOF creation on IA video...  this needs to be using "serve-dir" alias for RANGE requests, BTW!</b><br/>
+
+    <hr/>
+    <div id="log" style="font-family:monospace; white-space:pre"><b>LOG:</b><br/></div>
+
+
+    <script src="mp4cut.js"></script>
+</body>
+</html>
