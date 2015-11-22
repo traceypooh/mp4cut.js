@@ -24,8 +24,6 @@ function resetMediaSource() {
   video = document.getElementById('vxxx');  
 	mediaSource.video = video;
 	video.ms = mediaSource;
-	mediaSource.addEventListener("sourceopen", onSourceOpen);
-	mediaSource.addEventListener("sourceclose", onSourceClose);
 	video.src = window.URL.createObjectURL(mediaSource);
   log("MS RESET");
 
@@ -38,36 +36,31 @@ function resetMediaSource() {
 
 
 function initializeAllSourceBuffers(info) {
-	if (info) {
-    log("initializeAllSourceBuffers() has info");
-		for (var i = 0; i < info.tracks.length; i++) {
-			var track = info.tracks[i];
-      log("addbuffer() now for track "+i);
-			addBuffer(video, track);
-		}
-		initializeSourceBuffers(info);
+  log("initializeAllSourceBuffers() has info");
+	for (var i = 0; i < info.tracks.length; i++) {
+		var track = info.tracks[i];
+    log("addbuffer() now for track "+i);
+		addBuffer(video, track);
 	}
-}
-
-
-function initializeSourceBuffers(info) {
-  log('initializeSourceBuffers() finally');
   
+
   mediaSource.duration = info.duration/info.timescale; //xxx
-  
   
 	var initSegs = mp4box.initializeSegmentation();
 	for (var i = 0; i < initSegs.length; i++) {
 		var sb = initSegs[i].user;
-		if (i === 0) {
+		if (i === 0)
 			sb.ms.pendingInits = 0;
-		}
+
 		sb.addEventListener("updateend", onInitAppended);
 		Log.info("MSE - SourceBuffer #"+sb.id,"Appending initialization data");
 		sb.appendBuffer(initSegs[i].buffer);
 		sb.segmentIndex = 0;
 		sb.ms.pendingInits++;
 	}
+
+
+  //mp4box.seek(30,true);//xxxx
 }
 
 
@@ -137,30 +130,13 @@ function addBuffer(video, mp4track) {
 			});
 			sb.ms = ms;
 			sb.id = track_id;
-			mp4box.setSegmentOptions(track_id, sb, { nbSamples: SEGMENT_NUMBER_SAMPLES } );
+			mp4box.setSegmentOptions(track_id, sb, { nbSamples: SEGMENT_NUMBER_SAMPLES, rapAlignement:true } );
 			sb.pendingAppends = [];
 		} catch (e) {
 			Log.error("MSE - SourceBuffer #"+track_id,"Cannot create buffer with type '"+mime+"'" + e);
 		}
 	} else {
 		Log.warn("MSE", "MIME type '"+mime+"' not supported for creation of a SourceBuffer for track id "+track_id);
-	}
-}
-
-
-function onSourceOpen(e) {
-	var ms = e.target;
-	Log.info("MSE", "Source opened");
-	Log.debug("MSE", ms);
-	//urlSelector.disabled = false;
-}
-
-function onSourceClose(e) {
-	var ms = e.target;
-	if (ms.video.error) {
-		Log.error("MSE", "Source closed, video error: "+ ms.video.error.code);		
-	} else {
-		Log.info("MSE", "Source closed, no error");
 	}
 }
 
