@@ -1,25 +1,27 @@
 /* main functions, MSE-related */
 
-var SEGMENT_NUMBER_SAMPLES = 1000;
+const SEGMENT_NUMBER_SAMPLES = 1000;
+const FETCH_ENTIRE_FILE = true;
+const DOWNLOADER_CHUNK_SIZE = 2000000; // ~1.9MB
+const autoplay = true;
+const FI='commute.mp4';
 var video = false;
-var autoplay = true;
-var FI='../stairs.mp4';
+
 window.mediaSource = new MediaSource();
 Log.setLogLevel(Log.info);
 
-
- var log=function(){
-   for (arg in arguments)
-     $('#log').append(arguments[arg]+"\n");
-   if (typeof(console)=='undefined')
-     return;
-   console.log(arguments);
- };
+var log=function(){
+  for (arg in arguments)
+    $('#log').append(arguments[arg]+"\n");
+  if (typeof(console)=='undefined')
+    return;
+  console.log(arguments);
+};
 
 
 
 function resetMediaSource() {
-	video = document.getElementById('vxxx');  
+  video = document.getElementById('vxxx');  
 	mediaSource.video = video;
 	video.ms = mediaSource;
 	mediaSource.addEventListener("sourceopen", onSourceOpen);
@@ -66,8 +68,6 @@ function initializeSourceBuffers(info) {
 		sb.segmentIndex = 0;
 		sb.ms.pendingInits++;
 	}
-	//initAllButton.disabled = true;	
-	//initButton.disabled = true;
 }
 
 
@@ -79,10 +79,8 @@ function updateBufferedString(sb, string) {
 	if (sb.ms.readyState === "open") {
 		rangeString = Log.printRanges(sb.buffered);
 		Log.info("MSE - SourceBuffer #"+sb.id, string+", updating: "+sb.updating+", currentTime: "+Log.getDurationString(video.currentTime, 1)+", buffered: "+rangeString+", pending: "+sb.pendingAppends.length);
-		if (sb.bufferTd === undefined) {
+		if (sb.bufferTd === undefined)
 			sb.bufferTd = document.getElementById("buffer"+sb.id);
-		}
-		//sb.bufferTd.textContent = rangeString;
 	}
 }
 
@@ -98,10 +96,8 @@ function onInitAppended(e) {
 		/* In case there are already pending buffers we call onUpdateEnd to start appending them*/
 		onUpdateEnd.call(sb, false, true);
 		sb.ms.pendingInits--;
-		if (autoplay && sb.ms.pendingInits === 0) {
-			mp4box.start();//xxxx
-      downloader.resume();
-		}
+		if (autoplay  &&  sb.ms.pendingInits === 0)
+			mp4box.start();
 	}
 }
 
@@ -209,7 +205,7 @@ mp4box.onSegment = function (id, user, buffer, sampleNum) {	//xxxxx
 
  var downloader = new Downloader();
  downloader.setInterval(100);
- downloader.setChunkSize(2000000);
+ downloader.setChunkSize(DOWNLOADER_CHUNK_SIZE);
  downloader.setUrl(FI);
  downloader.start();
 
