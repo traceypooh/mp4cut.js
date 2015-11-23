@@ -1,7 +1,28 @@
 /* main functions, MSE-related */
 
+/*
+TODO:
+
+xxx=mp4box.writeFile(); // to write moov
+size1=xxx.bytelength;
+// ... update header
+xxx=mp4box.writeFile(); // to write moov
+size2=xxx.bytelength;
+// the difference + (samples[start].offset - samples[0].offset)  should be the difference!
+
+
+
+- read mp4 header
+- determine seek pts
+- rewrite header
+- write 
+- xhr dump start/end range
+
+
+*/
+
 const SEGMENT_NUMBER_SAMPLES = 1000;
-const FETCH_ENTIRE_FILE = true;
+const FETCH_ENTIRE_FILE = false;
 const DOWNLOADER_CHUNK_SIZE = 2000000; // ~1.9MB
 const autoplay = true;
 const FI='commute.mp4';
@@ -9,6 +30,7 @@ var video = false;
 
 window.mediaSource = new MediaSource();
 Log.setLogLevel(Log.info);
+Log.setLogLevel(Log.debug);
 
 var log=function(){
   for (arg in arguments)
@@ -26,9 +48,6 @@ function resetMediaSource() {
 	video.ms = mediaSource;
 	video.src = window.URL.createObjectURL(mediaSource);
   log("MS RESET");
-
-  log('mediaSource.readyState:');
-  log(mediaSource.readyState)
 
   log('mediaSource.readyState:');
   log(mediaSource.readyState)
@@ -61,6 +80,33 @@ function initializeAllSourceBuffers(info) {
 
 
   //mp4box.seek(30,true);//xxxx
+}
+
+
+function addBuffer(video, mp4track) {
+	var sb;
+	var ms = window.mediaSource;//video.ms;//xxxx
+	var track_id = mp4track.id;
+	var codec = mp4track.codec;
+	var mime = 'video/mp4; codecs=\"'+codec+'\"';
+	var kind = mp4track.kind;
+	if (MediaSource.isTypeSupported(mime)) {
+		try {
+			Log.info("MSE - SourceBuffer #"+track_id,"Creation with type '"+mime+"'");
+			sb = ms.addSourceBuffer(mime);
+			sb.addEventListener("error", function(e) {
+				Log.error("MSE SourceBuffer #"+track_id,e);
+			});
+			sb.ms = ms;
+			sb.id = track_id;
+			mp4box.setSegmentOptions(track_id, sb, { nbSamples: SEGMENT_NUMBER_SAMPLES, rapAlignement:true } );
+			sb.pendingAppends = [];
+		} catch (e) {
+			Log.error("MSE - SourceBuffer #"+track_id,"Cannot create buffer with type '"+mime+"'" + e);
+		}
+	} else {
+		Log.warn("MSE", "MIME type '"+mime+"' not supported for creation of a SourceBuffer for track id "+track_id);
+	}
 }
 
 
@@ -113,32 +159,6 @@ function onUpdateEnd(isNotInit, isEndOfAppend) {
 }
 
 
-function addBuffer(video, mp4track) {
-	var sb;
-	var ms = window.mediaSource;//video.ms;//xxxx
-	var track_id = mp4track.id;
-	var codec = mp4track.codec;
-	var mime = 'video/mp4; codecs=\"'+codec+'\"';
-	var kind = mp4track.kind;
-	if (MediaSource.isTypeSupported(mime)) {
-		try {
-			Log.info("MSE - SourceBuffer #"+track_id,"Creation with type '"+mime+"'");
-//      debugger;
-			sb = ms.addSourceBuffer(mime);
-			sb.addEventListener("error", function(e) {
-				Log.error("MSE SourceBuffer #"+track_id,e);
-			});
-			sb.ms = ms;
-			sb.id = track_id;
-			mp4box.setSegmentOptions(track_id, sb, { nbSamples: SEGMENT_NUMBER_SAMPLES, rapAlignement:true } );
-			sb.pendingAppends = [];
-		} catch (e) {
-			Log.error("MSE - SourceBuffer #"+track_id,"Cannot create buffer with type '"+mime+"'" + e);
-		}
-	} else {
-		Log.warn("MSE", "MIME type '"+mime+"' not supported for creation of a SourceBuffer for track id "+track_id);
-	}
-}
 
 
 
@@ -161,6 +181,12 @@ mp4box.onError = function(e) {
 mp4box.onReady = function(info) {
   log("onReady info:");
   log(info);
+
+  log("WRITING!");
+  window.xxx = mp4box.writeFile(); 
+  log("WRITTEN!"); return; //xxxxxxxx
+  
+  
 	if (mediaSource.readyState === "open")
     initializeAllSourceBuffers(info);
   else
