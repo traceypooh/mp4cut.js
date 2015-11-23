@@ -13,11 +13,11 @@
   <body>
     <h1>mp4cut.js -- JS/clientside based clipping of an .mp4 file - rewrites header and only (losslessly) sends desired A/V packets for the desired start/end range</h1>
     Uses mp4/moov parsing JS from <a href="http://download.tsi.telecom-paristech.fr/gpac/mp4box.js/">mp4box.js</a><br/>
-    <b>(soon to) uses the Media Source API</b><br/>
+    <b>Uses the Media Source API</b><br/>
     <a href="https://hacks.mozilla.org/2015/07/streaming-media-on-demand-with-media-source-extensions/">https://hacks.mozilla.org/2015/07/streaming-media-on-demand-with-media-source-extensions/</a><br/>
     to inject video to this tag:<br/>
-    <video controls autoplay width="320" height="240"></video><br/>
-    <b style="color:red">tracey fixme: now try to rewrite header of c.mp4 and then append header and 10+ seconds into video into a new mediasource element into the empty video tag above!  if THAT works -- then see if can do DASH style MOOF creation on IA video...  this needs to be using "serve-dir" alias for RANGE requests, BTW!</b><br/>
+    <video id="vxxx" controls autoplay width="320" height="240"></video><br/>
+    <b style="color:red">(media files need to be served using something like <code>ruby -run -e httpd . -p 8000</code> for http RANGE requests, and the server need to support CORS options)</b><br/>
 
     <hr/>
     <div id="log" style="font-family:monospace; white-space:pre"><b>LOG:</b><br/></div>
@@ -42,13 +42,16 @@
  // cp commute.mp4  commute-ms.mp4;
  FI='commute_dashinit.mp4'; // but this has no keyframes STSS for trimming!
 //FI='commute.mp4';    // currently header is incompatible with MediaSource (prior one is compatible)
-// FI='../commute-frag.mp4'; // but this has no keyframes STSS for trimming!
+ // FI='../commute-frag.mp4'; // but this has no keyframes STSS for trimming!
+ FI='stairs.mp4';
  var START=10;
  var END=20;
  var FETCH_ENTIRE_FILE=false;
  var fragment=false;
 
  var mimeCodec = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
+
+ if (!fragment){
  window.mediaSource = new MediaSource();
  mediaSource.append = function(buffer){ // NOTE: tracey added function
    if (!mediaSource.started){
@@ -65,7 +68,8 @@
      mediaSource.sourceBuffer.appendBuffer(buffer);
    }
  };
- 
+ }
+
  
  //FI='COMW_20130726_023000_The_Daily_Show_With_Jon_Stewart.mp4';
  //START=1207;
@@ -81,6 +85,10 @@ Log.setLogLevel(Log.info);
      return;
    console.log(arguments);
  };
+
+
+
+ 
  
  window.mp4box = new MP4Box();
  mp4box.onMoovStart = function () {
@@ -96,6 +104,7 @@ Log.setLogLevel(Log.info);
 
 
    if (fragment){
+
      mp4box.onSegment = function (id, user, buffer) {
        log("Received segment on track "+id+" for object "+user+" with a length of "+buffer.byteLength);
      }
@@ -128,7 +137,7 @@ Log.setLogLevel(Log.info);
    
    
 //log("SEEK ME"); log(mp4box.seek(10, true)); return;//xxxxxxxxxx
-   mediaSource.append(mp4box.writeFile()); return; //xxxxxxxx
+//   mediaSource.append(mp4box.writeFile()); return; //xxxxxxxx
      
    
    mp4box.stop();//xxxx no work?
@@ -226,7 +235,6 @@ Log.setLogLevel(Log.info);
 
 
    var moov_duration = 0;
-   var offset = 0;//xxxx
    var end_offset = 0;
    var skip_from_start = Number.MAX_VALUE;
    var mdat_start = mdat.start;//xxxx
@@ -361,19 +369,28 @@ Log.setLogLevel(Log.info);
    log("moov: new_duration="+(moov_duration / moov_time_scale)+" seconds");
 
    // subtract bytes we skip at the front of the mdat atom
-   offset -= skip_from_start;
+   var offset = 0 - skip_from_start;
+   log("shifting offsets by " + offset);   
    
    log("moov: writing header");
-   
-   //moov_write(moov, moov_data); //xxx
-   var moov_size = 0;//xxxx
-   //moov_size = read_32(moov_data);//xxxx
+
+   // compute moov header size
+   var tmpxxx = mp4box.writeFile();
+   var moov_size = tmpxxx.byteLength;
+   log("moov size: "+moov_size);
+   delete tmpxxx;
    
    // add new moov size
    offset += moov_size;
-   
    log("shifting offsets by " + offset);
-   //moov_shift_offsets_inplace(moov, offset);//xxx
+   
+   // moov_shift_offsets_inplace(moov, offset);
+   for (var trak in moov.traks){
+     for (var i=0; i < moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets.length; i++)
+       moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[i] += offset;
+   }//end for (var trak in moov.traks)
+   
+   
    //create_traffic_shaping(moov, ... //xxx ??!
    
 
