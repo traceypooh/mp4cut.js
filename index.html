@@ -32,18 +32,8 @@
  grunt;
  */
 
- var FI='http://ia600301.us.archive.org/~tracey/cors_get.php?path=/27/items/stairs/stairs.mp4';
-
- // sudo apt-get install gpac;
- // wget wget archive.org/download/commute/commute.mp4;
- // wget wget archive.org/download/commute/commute.avi;
- // MP4Box -dash 10000 -rap -frag-rap commute.mp4
- // ffmpeg -y -i commute.avi   -movflags +frag_keyframe+empty_moov  commute-frag.mp4 
- // cp commute.mp4  commute-ms.mp4;
- FI='commute_dashinit.mp4'; // but this has no keyframes STSS for trimming!
-//FI='commute.mp4';    // currently header is incompatible with MediaSource (prior one is compatible)
- // FI='../commute-frag.mp4'; // but this has no keyframes STSS for trimming!
- FI='stairs.mp4';
+ var FI='http://ia600301.us.archive.org/cors_get.php?path=/27/items/stairs/stairs.mp4';
+//FI='stairs.mp4';
  var START=10;
  var END=20;
  var FETCH_ENTIRE_FILE=false;
