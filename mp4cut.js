@@ -21,336 +21,307 @@ size2=xxx.bytelength;
 
 */
 
-const SEGMENT_NUMBER_SAMPLES = 1000;
-var   FETCH_ENTIRE_FILE = false;
-const FI='commute.mp4';
-//const FI='stairs.mp4';
-const DOWNLOADER_CHUNK_SIZE = (FI=='commute.mp4' ? 2000000 : 100000); // ~1.9MB
-const autoplay = true;
-var video = false;
-var inMSE = false;
 
-window.mediaSource = new MediaSource();
-if (FI=='stairs.mp4')
-  Log.setLogLevel(Log.debug);
-else
-  Log.setLogLevel(Log.info);
+(function( $ ) {
 
-var log=function(){
-  for (arg in arguments)
-    $('#log').append(arguments[arg]+"\n");
-  if (typeof(console)=='undefined')
-    return;
-  console.log(arguments);
-};
-log('FILE: '+FI);
+  function MP4cut(FILE, START, END){
+    if (!FILE)
+      FILE = 'http://ia600301.us.archive.org/cors_get.php?path=/27/items/stairs/stairs.mp4';
+    const fragment=false;
 
+    const SEGMENT_NUMBER_SAMPLES = 1000;
+    var   FETCH_ENTIRE_FILE = false;
+    const FI='commute.mp4';
+    //const FI='stairs.mp4';
+    const DOWNLOADER_CHUNK_SIZE = (FI=='commute.mp4' ? 2000000 : 100000); // ~1.9MB
+    const autoplay = true;
+    var video = false;
+    var inMSE = false;
+    var self = this;
+    
+    var mediaSource = new MediaSource();
+    if (FI=='stairs.mp4')
+      Log.setLogLevel(Log.debug);
+    else
+      Log.setLogLevel(Log.info);
+    
+    var log=function(){
+      for (arg in arguments)
+        $('#log').append(arguments[arg]+"\n");
+      if (typeof(console)=='undefined')
+        return;
+      console.log(arguments);
+    };
+    log('FILE: '+FI);
 
-function resetMediaSource() {
-  video = document.getElementById('vxxx');  
-	mediaSource.video = video;
-	video.ms = mediaSource;
-	video.src = window.URL.createObjectURL(mediaSource);
-  log("MS RESET");
-
-  log('mediaSource.readyState:');
-  log(mediaSource.readyState)
-}
-
-
-function initializeSourceBuffersAndSegmentation(info) {
-  log("initializeSourceBuffersAndSegmentation() has info");
-  if (mediaSource.readyState != 'open'){
-    setTimeout(function(){ initializeSourceBuffersAndSegmentation(info); }, 1000);//xxxx
-    return;
-  }
+    
 
 
-	for (var i = 0; i < info.tracks.length; i++) {
-		var track = info.tracks[i];
-    log("addbuffer() now for track "+i);
-		addBuffer(video, track);
-	}
+    // helper method
+    self.stts_get_duration = function(stts){
+      var duration = 0;
+      for(var i=0; i < stts.sample_counts.length; i++)
+        duration += stts.sample_counts[i] * stts.sample_deltas[i];
+      return duration;
+    };
+    
+    // helper method
+    self.trak_time_to_moov_time = function(t, moov_time_scale, trak_time_scale){
+      return t * moov_time_scale / trak_time_scale;
+    };
+
+
+    self.resetMediaSource = function() {
+      video = document.getElementById('vxxx');  
+	    mediaSource.video = video;
+	    video.ms = mediaSource;
+	    video.src = window.URL.createObjectURL(mediaSource);
+      log("MS RESET");
+      
+      log('mediaSource.readyState:');
+      log(mediaSource.readyState)
+    };
+
+
+    self.initializeSourceBuffersAndSegmentation = function(info) {
+      log("initializeSourceBuffersAndSegmentation() has info");
+      if (mediaSource.readyState != 'open'){
+        setTimeout(function(){ self.initializeSourceBuffersAndSegmentation(info); }, 1000);//xxxx
+        return;
+      }
+
+
+	    for (var i = 0; i < info.tracks.length; i++) {
+		    var track = info.tracks[i];
+        log("addbuffer() now for track "+i);
+		    self.addBuffer(video, track);
+	    }
   
 
-  mediaSource.duration = info.duration/info.timescale; //xxx
-  
-	var initSegs = mp4box.initializeSegmentation();
-	for (var i = 0; i < initSegs.length; i++) {
-		var sb = initSegs[i].user;
-		if (i === 0)
-			sb.ms.pendingInits = 0;
-
-		sb.addEventListener("updateend", onInitAppended);
-		Log.info("MSE - SourceBuffer #"+sb.id,"Appending initialization data");
-		sb.appendBuffer(initSegs[i].buffer);
-		sb.segmentIndex = 0;
-		sb.ms.pendingInits++;
-	}
-
-
-  //mp4box.seek(30,true);//xxxx
-}
+      mediaSource.duration = info.duration/info.timescale; //xxx
+      
+	    var initSegs = mp4box.initializeSegmentation();
+	    for (var i = 0; i < initSegs.length; i++) {
+		    var sb = initSegs[i].user;
+		    if (i === 0)
+			    sb.ms.pendingInits = 0;
+        
+		    sb.addEventListener("updateend", self.onInitAppended);
+		    Log.info("MSE - SourceBuffer #"+sb.id,"Appending initialization data");
+		    sb.appendBuffer(initSegs[i].buffer);
+		    sb.segmentIndex = 0;
+		    sb.ms.pendingInits++;
+	    }
+    };
 
 
-function addBuffer(video, mp4track) {
-	var sb;
-	var ms = window.mediaSource;//video.ms;//xxxx
-	var track_id = mp4track.id;
-	var codec = mp4track.codec;
-	var mime = 'video/mp4; codecs=\"'+codec+'\"';
-	var kind = mp4track.kind;
-	if (MediaSource.isTypeSupported(mime)) {
-		try {
-			Log.info("MSE - SourceBuffer #"+track_id,"Creation with type '"+mime+"'");
-			sb = ms.addSourceBuffer(mime);
-			sb.addEventListener("error", function(e) {
-				Log.error("MSE SourceBuffer #"+track_id,e);
-			});
-			sb.ms = ms;
-			sb.id = track_id;
-			mp4box.setSegmentOptions(track_id, sb, { nbSamples: SEGMENT_NUMBER_SAMPLES, rapAlignement:true } );
-			sb.pendingAppends = [];
-		} catch (e) {
-			Log.error("MSE - SourceBuffer #"+track_id,"Cannot create buffer with type '"+mime+"'" + e);
-		}
-	} else {
-		Log.warn("MSE", "MIME type '"+mime+"' not supported for creation of a SourceBuffer for track id "+track_id);
-	}
-}
+    self.addBuffer = function(video, mp4track) {
+	    var sb;
+	    var ms = mediaSource;
+	    var track_id = mp4track.id;
+	    var codec = mp4track.codec;
+	    var mime = 'video/mp4; codecs=\"'+codec+'\"';
+	    var kind = mp4track.kind;
+	    if (MediaSource.isTypeSupported(mime)) {
+		    try {
+			    Log.info("MSE - SourceBuffer #"+track_id,"Creation with type '"+mime+"'");
+			    sb = ms.addSourceBuffer(mime);
+			    sb.addEventListener("error", function(e) {
+				    Log.error("MSE SourceBuffer #"+track_id,e);
+			    });
+			    sb.ms = ms;
+			    sb.id = track_id;
+			    mp4box.setSegmentOptions(track_id, sb, { nbSamples: SEGMENT_NUMBER_SAMPLES, rapAlignement:true } );
+			    sb.pendingAppends = [];
+		    } catch (e) {
+			    Log.error("MSE - SourceBuffer #"+track_id,"Cannot create buffer with type '"+mime+"'" + e);
+		    }
+	    } else {
+		    Log.warn("MSE", "MIME type '"+mime+"' not supported for creation of a SourceBuffer for track id "+track_id);
+	    }
+    };
 
 
 				
 
 
-function updateBufferedString(sb, string) {
-	var rangeString;
-	if (sb.ms.readyState === "open") {
-		rangeString = Log.printRanges(sb.buffered);
-		Log.info("MSE - SourceBuffer #"+sb.id, string+", updating: "+sb.updating+", currentTime: "+Log.getDurationString(video.currentTime, 1)+", buffered: "+rangeString+", pending: "+sb.pendingAppends.length);
-		if (sb.bufferTd === undefined)
-			sb.bufferTd = document.getElementById("buffer"+sb.id);
-	}
-}
+    self.updateBufferedString = function(sb, string) {
+	    var rangeString;
+	    if (sb.ms.readyState === "open") {
+		    rangeString = Log.printRanges(sb.buffered);
+		    Log.info("MSE - SourceBuffer #"+sb.id, string+", updating: "+sb.updating+", currentTime: "+Log.getDurationString(video.currentTime, 1)+", buffered: "+rangeString+", pending: "+sb.pendingAppends.length);
+		    if (sb.bufferTd === undefined)
+			    sb.bufferTd = document.getElementById("buffer"+sb.id);
+	    }
+    };
 
 
 
-function onInitAppended(e) {
-	var sb = e.target;
-	if (sb.ms.readyState === "open") {
-		updateBufferedString(sb, "Init segment append ended");
-		sb.sampleNum = 0;
-		sb.removeEventListener('updateend', onInitAppended);
-		sb.addEventListener('updateend', onUpdateEnd.bind(sb, true, true));
-		/* In case there are already pending buffers we call onUpdateEnd to start appending them*/
-		onUpdateEnd.call(sb, false, true);
-		sb.ms.pendingInits--;
-		if (autoplay  &&  sb.ms.pendingInits === 0)
-			mp4box.start();
-	}
-}
-
-function onUpdateEnd(isNotInit, isEndOfAppend) {
-	if (isEndOfAppend === true) {
-		if (isNotInit === true) {
-			updateBufferedString(this, "Update ended");
-		}
-		if (this.sampleNum) {
-			mp4box.releaseUsedSamples(this.id, this.sampleNum);
-			delete this.sampleNum;
-		}
-	}
-	if (this.ms.readyState === "open" && this.updating === false && this.pendingAppends.length > 0) {
-		var obj = this.pendingAppends.shift();
-		Log.info("MSE - SourceBuffer #"+this.id, "Appending new buffer, pending: "+this.pendingAppends.length);
-		this.sampleNum = obj.sampleNum;
-		this.appendBuffer(obj.buffer);
-	}
-}
+    self.onInitAppended = function(e) {
+	    var sb = e.target;
+	    if (sb.ms.readyState === "open") {
+		    self.updateBufferedString(sb, "Init segment append ended");
+		    sb.sampleNum = 0;
+		    sb.removeEventListener('updateend', self.onInitAppended);
+		    sb.addEventListener('updateend', self.onUpdateEnd.bind(sb, true, true));
+		    /* In case there are already pending buffers we call onUpdateEnd to start appending them*/
+		    self.onUpdateEnd.call(sb, false, true);
+		    sb.ms.pendingInits--;
+		    if (autoplay  &&  sb.ms.pendingInits === 0)
+			    mp4box.start();
+	    }
+    };
 
 
-
-
-
+    self.onUpdateEnd = function(isNotInit, isEndOfAppend) {
+	    if (isEndOfAppend === true) {
+		    if (isNotInit === true) {
+			    self.updateBufferedString(this, "Update ended");
+		    }
+		    if (this.sampleNum) {
+			    mp4box.releaseUsedSamples(this.id, this.sampleNum);
+			    delete this.sampleNum;
+		    }
+	    }
+	    if (this.ms.readyState === "open" && this.updating === false && this.pendingAppends.length > 0) {
+		    var obj = this.pendingAppends.shift();
+		    Log.info("MSE - SourceBuffer #"+this.id, "Appending new buffer, pending: "+this.pendingAppends.length);
+		    this.sampleNum = obj.sampleNum;
+		    this.appendBuffer(obj.buffer);
+	    }
+    };
 
 
 
 
 
-resetMediaSource();  //xxxx
-video.play();
+    // xxxxx now move the new MP4Box() stuff above here...
+    self.resetMediaSource();  //xxxx
+    video.play();
  
-window.mp4boxHdr = new MP4Box();
-window.mp4box    = new MP4Box();
-mp4boxHdr.onMoovStart = function () {
-  log("HDR Starting to receive File Information");
-}
-mp4boxHdr.onError = function(e) {
-  log("HDR error:");
-  log(e);
-};
-mp4boxHdr.onReady = function(info) {
-  log("HDR onReady info:");
-  log(info);
-};
-
-
-
-mp4box.onReady = function(info){
-  log("onReady info:");
-  log(info);
-  initializeSourceBuffersAndSegmentation(info);
-};
-
-mp4box.onSegment = function (id, user, buffer, sampleNum) {	//xxxxx
-	var sb = user;
-	sb.segmentIndex++;
-	sb.pendingAppends.push({ id: id, buffer: buffer, sampleNum: sampleNum });
-	Log.info("Application","Received new segment for track "+id+" up to sample #"+sampleNum+", segments pending append: "+sb.pendingAppends.length);
-	onUpdateEnd.call(sb, true, false);
-};
-
-
-
- var downloader = new Downloader();
- downloader.setInterval(100);
- downloader.setChunkSize(DOWNLOADER_CHUNK_SIZE);
- downloader.setUrl(FI);
- downloader.start();
-
-
-
- downloader.setCallback(
-   function (response, end, error) { 
-     log('DL callback()');
-     log('DL end: '+end);
-     log('DL response #bytes: ' + response.byteLength);
-     // response == ArrayBuffer;  response.usedBytes -v- response.byteLength
-     /*xxxx
-       var s=new DataStream();
-       s.endianness = DataStream.BIG_ENDIAN;
-       mp4box.inputIsoFile.write(s);
-       s.buffer == ArrayBuffer!
-       s.buffer.byteLength == moov header size (50787 B) too for commute.mp4
-
-       before all flush() change things
-       mp4box.inputStream.buffers[0].usedBytes *seems* to be the header and size of it...
-
-
-
-       once readySent() (have (just) header):
-       MSE setup
-       range request next chunk to mp4box
-       range request next chunk to mp4box
-
-       rewrite header (tracey)
-       downloader range request new wanted A/V range of bytes
-       initializeSourceBuffersAndSegmentation(info);
-     */
-
-     // (NOTE: tracey extending downloader w/ instance var)
-     downloader.nextStart = 0;
-     if (response){
-       if (inMSE)
-         downloader.nextStart = mp4box.appendBuffer(response);
-       else
-         downloader.nextStart = mp4boxHdr.appendBuffer(response);
-     }
-     
-     if (end){
-       mp4boxHdr.flush();
-       mp4box.flush();
-     }
-     else {
-       if (!FETCH_ENTIRE_FILE  &&  mp4boxHdr.readySent){
-         downloader.stop();
-         
-         // Tthis is where things get real...
-         // Write *JUST* the header, into the *NEW* mp4box var.
-         // "Rewind" the downloader parser to *just* after the header.
-         // Set the next chunk to download to there, and keep going!
-         mp4box.appendBuffer(mp4boxHdr.inputStream.buffers[0]);
-         var headerSize = mp4boxHdr.inputStream.buffers[0].usedBytes;
-         log('HEADER SIZE: ' + headerSize);
-         downloader.nextStart = headerSize;
-         downloader.setChunkStart(downloader.nextStart);
-         FETCH_ENTIRE_FILE = true;
-         inMSE = true;
-         downloader.resume();
-       }
-       else{
-         log('DL fetching '+FI+' bytes starting at: ' + downloader.nextStart);
-         downloader.setChunkStart(downloader.nextStart);
-       }
-     }     
-     if (error)
-       reset();
-   }
- );
-  
-
-
-
-
-//////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////
-
-
-(function( $ ) {
-  var FILE = 'http://ia600301.us.archive.org/cors_get.php?path=/27/items/stairs/stairs.mp4';
-  FILE = 'commute.mp4';
-  var START = 10;
-  var END = 20
-  const FETCH_ENTIRE_FILE=true;
-  const fragment=false;
-  
-  const mimeCodec = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
-
-
-  var MP4cut = {};
-
-  MP4cut.prototype.constructor = function(FILE, START, END){
-    var mp4cut = this;
-
-    window.mp4box = new MP4Box();//xxx var
-    mp4box.onMoovStart = function () {
-      log("Starting to receive File Information");
+    window.mp4boxHdr = new MP4Box();//xxx
+    window.mp4box    = new MP4Box();//xxx
+    mp4boxHdr.onMoovStart = function () {
+      log("HDR Starting to receive File Information");
     }
-    mp4box.onError = function(e) {
-      log("error:");
+    mp4boxHdr.onError = function(e) {
+      log("HDR error:");
       log(e);
     };
-    mp4box.onReady = function(info) {
-      log("onReady info:");
+    mp4boxHdr.onReady = function(info) {
+      log("HDR onReady info:");
       log(info);
-      
-      mp4cut.cut();
-    }
+    };
 
-  };
 
     
-  MP4cut.prototype.cut = function(){
+    mp4box.onReady = function(info){
+      log("onReady info:");
+      log(info);
+      self.initializeSourceBuffersAndSegmentation(info);
+    };
+    
+    mp4box.onSegment = function (id, user, buffer, sampleNum) {	//xxxxx
+	    var sb = user;
+	    sb.segmentIndex++;
+	    sb.pendingAppends.push({ id: id, buffer: buffer, sampleNum: sampleNum });
+	    Log.info("Application","Received new segment for track "+id+" up to sample #"+sampleNum+", segments pending append: "+sb.pendingAppends.length);
+	    self.onUpdateEnd.call(sb, true, false);
+    };
 
-     mp4box.stop();//xxxx no work?
-   
-     var stts_get_duration = function(stts){
-       var duration = 0;
-       for(var i=0; i < stts.sample_counts.length; i++)
-         duration += stts.sample_counts[i] * stts.sample_deltas[i];
-       return duration;
-     };
+
+
+    var downloader = new Downloader();
+    downloader.setInterval(100);
+    downloader.setChunkSize(DOWNLOADER_CHUNK_SIZE);
+    downloader.setUrl(FI);
+    downloader.start();
+
+
+    
+    downloader.setCallback(
+      function (response, end, error) { 
+        log('DL callback()');
+        log('DL end: '+end);
+        log('DL response #bytes: ' + response.byteLength);
+        // response == ArrayBuffer;  response.usedBytes -v- response.byteLength
+        /*xxxx
+          var s=new DataStream();
+          s.endianness = DataStream.BIG_ENDIAN;
+          mp4box.inputIsoFile.write(s);
+          s.buffer == ArrayBuffer!
+          s.buffer.byteLength == moov header size (50787 B) too for commute.mp4
+          
+          before all flush() change things
+          mp4box.inputStream.buffers[0].usedBytes *seems* to be the header and size of it...
+          
+          
+          
+          once readySent() (have (just) header):
+          MSE setup
+          range request next chunk to mp4box
+          range request next chunk to mp4box
+          
+          rewrite header (tracey)
+          downloader range request new wanted A/V range of bytes
+          self.initializeSourceBuffersAndSegmentation(info);
+        */
+        
+        // (NOTE: tracey extending downloader w/ instance var)
+        downloader.nextStart = 0;
+        if (response){
+          if (inMSE)
+            downloader.nextStart = mp4box.appendBuffer(response);
+          else
+            downloader.nextStart = mp4boxHdr.appendBuffer(response);
+        }
      
-     var trak_time_to_moov_time = function(t, moov_time_scale, trak_time_scale){
-       return t * moov_time_scale / trak_time_scale;
-     };
+        if (end){
+          mp4boxHdr.flush();
+          mp4box.flush();
+        }
+        else {
+          if (!FETCH_ENTIRE_FILE  &&  mp4boxHdr.readySent){
+            downloader.stop();
+            
+            // This is where things get real...
+            // Write *JUST* the header, into the *NEW* mp4box var.
+            // (The header always seems to nicely appear magically in 
+            //  buffers[0], extending the base buffer size if/as needed, 
+            //  until the entire header is read.  All of that
+            //  sort of makes sense so the entire header can be parsed via
+            //  a single buffer, etc.)
+            // "Rewind" the downloader parser to *just* after the header.
+            // Set the next chunk we will download to there, and keep going,
+            // writing the rest of the mp4 file to the *NEW* mp4box var
+            // (which will be writing to MediaSource and thus our <video> tag).
+            mp4box.appendBuffer(mp4boxHdr.inputStream.buffers[0]);
+            var headerSize = mp4boxHdr.inputStream.buffers[0].usedBytes;
+            log('HEADER SIZE: ' + headerSize);
+            downloader.nextStart = headerSize;
+            downloader.setChunkStart(downloader.nextStart);
+            FETCH_ENTIRE_FILE = true;
+            inMSE = true;
+            downloader.resume();
+          }
+          else{
+            log('DL fetching '+FI+' bytes starting at: ' + downloader.nextStart);
+            downloader.setChunkStart(downloader.nextStart);
+          }
+        }     
+        if (error)
+          reset();
+      }
+    );//end downloader.setCallback
+  
 
-   
-   window.moov = mp4box.inputIsoFile.moov;
-   window.mdat = mp4box.inputIsoFile.mdats[0];
-   var moov_time_scale = moov.mvhd.timescale;
+    
+
+    self.cut = function(){
+      window.moov = mp4box.inputIsoFile.moov;//xxxx
+      window.mdat = mp4box.inputIsoFile.mdats[0];//xxxx
+      var moov_time_scale = moov.mvhd.timescale;
+
    var nearestKeyframe=0;
    var nearestKeyframeTrak=-1;
    var starts=[]; // NOTE: these become starting sample *NUMBER* (not time!) for each track
@@ -586,6 +557,21 @@ mp4box.onSegment = function (id, user, buffer, sampleNum) {	//xxxxx
    
    
    //create_traffic_shaping(moov, ... //xxx ??!
-   }; //end MP4cut.prototype.cut()
+    
+
+    };//end self.cut
+  }//end function MP4cut..
+
+
+  // make it so we can do "new MP4cut()" internally (only):
+  MP4cut.prototype.constructor = MP4cut; 
+  // make it so we can do "new MP4cut(FILE, START, END)" globally:
+  window.MP4cut = function(FILE, START, END){ return new MP4cut(FILE, START, END); };
 
 }( jQuery ));
+
+
+$(function(){
+  // on dom ready...
+  new MP4cut('commute.mp4', 10, 20);
+});
