@@ -44,7 +44,7 @@ size2=xxx.bytelength;
     const SEGMENT_NUMBER_SAMPLES = 1000;
     const DOWNLOADER_CHUNK_SIZE = (FILE=='commute.mp4' ? 2000000 : 100000); // ~1.9MB
     const autoplay = true;
-    const REWRITE = false;
+    const REWRITE = false;//xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
     var FETCH_ENTIRE_FILE = false;
     var video = false;
@@ -86,6 +86,19 @@ size2=xxx.bytelength;
       return t * moov_time_scale / trak_time_scale;
     };
 
+
+    self.dumpSTCO = function(mp4, only){
+      var moov = mp4.inputIsoFile.moov;
+      for (var trak in moov.traks){
+        if (typeof(only) != 'undefined'  &&  trak!=only)
+          continue;
+        log('STCO, trak:'+trak+' ( '+moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets.length+' offsets)');
+        log(moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[0]);
+        log(moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[1]);
+        log(moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets);
+      }
+    };
+    
 
     self.resetMediaSource = function() {
       video = document.getElementById('vxxx');  
@@ -259,7 +272,7 @@ size2=xxx.bytelength;
       function (response, end, error) { 
         log('DL callback()');
         log('DL end: '+end);
-        log('DL response #bytes: ' + response.byteLength);
+        log('DL response #bytes: ' + (response ? response.byteLength : 0));
         // response == ArrayBuffer;  response.usedBytes -v- response.byteLength
         /*xxxx
           var s=new DataStream();
@@ -319,14 +332,26 @@ size2=xxx.bytelength;
             var skip_from_start = 0;
             if (REWRITE){
               // REWRITE THE HEADER!
+              //self.dumpSTCO(mp4boxHdr);
               skip_from_start = self.cut();
-              // write new header to a DataStream / buffer (xxx this could prolly be more efficient)
-              var xxx=new DataStream();
-              xxx.endianness = DataStream.BIG_ENDIAN;  
-              mp4boxHdr.inputIsoFile.moov.write(xxx);
-              xxx._buffer.fileStart = 0; //xxx ugh
-              mp4box.appendBuffer(xxx._buffer);
-              // xxx.byteLength  // new header size!
+              //log(mp4boxHdr.inputStream.buffers[0].usedBytes);
+              //self.dumpSTCO(mp4boxHdr);
+              
+              if (1){ // which technique?!?   suck.  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+                // write new header to a DataStream / buffer (xxx this could prolly be more efficient)
+                var xxx=new DataStream();
+                xxx.endianness = DataStream.BIG_ENDIAN;  
+                mp4boxHdr.inputIsoFile.moov.write(xxx);
+                xxx._buffer.fileStart = 0; //xxx ugh
+                mp4box.appendBuffer(xxx._buffer);
+                // xxx.byteLength  // new header size!
+              }
+              else {
+                var arybuf = mp4boxHdr.writeFile();
+                log("new moov header size: "+arybuf.byteLength);
+                arybuf.fileStart = 0; //xxx ugh
+                mp4box.appendBuffer(arybuf);
+              }
             }
             else {
               mp4box.appendBuffer(mp4boxHdr.inputStream.buffers[0]);
@@ -446,9 +471,10 @@ size2=xxx.bytelength;
         
         var skip = (moov.traks[trak].samples[start].offset -
                     moov.traks[trak].samples[0].offset);
-        if (skip < skip_from_start)
+        if (skip < skip_from_start){
           skip_from_start = skip;
-        log('CAN SKIP '+skip+' BYTES!');
+          log('CAN SKIP '+skip+' BYTES! (starting with sample #'+start+' in trak #'+trak+' which is now at byte '+(moov.traks[trak].samples[start].offset)+')');
+        }
         
         if ((end+1) < moov.traks[trak].samples.length){
           var end_pos = moov.traks[trak].samples[end].offset;
@@ -499,9 +525,11 @@ size2=xxx.bytelength;
               !stsc.samples_per_chunk.length  &&
               !stsc.sample_description_index.length){
             // eg: MP4Box -dash 10000 -rap -frag-rap c.mp4
+            alert('is this a problem xxx?!');
           }
           else{
             // eg: normal IA video
+            //debugger;//xxx
             for (var nChunks=stsc.samples_per_chunk.length/*xxx verify!*/;   chunk_start < nChunks; chunk_start++){
               if (stsc.first_chunk[nChunks] + stsc.samples_per_chunk[nChunks] > start)
                 break; // found the right chunk!
@@ -514,12 +542,19 @@ size2=xxx.bytelength;
           }
           var chunk_end=moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets.length;//xxx (see above alert!)
           var entries=0;
+          log("====================FTW1====================");
+          self.dumpSTCO(mp4, trak);
+
+          chunk_start = start;  chunk_end = end; //xxxx  assumes 1 set of chunks AND/OR single moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets -- which prolly *IS* legit -- but axe bunch of useless work above??!?
+          
           for (var i=chunk_start; i < chunk_end; i++){
             moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[entries] =
             moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[i]; // xxx need to subtract amount of header we will shrink down by  *PLUS*  the first byte jump distance between orig vs ne A/V packets...
             entries++;
           }
+          log("====================FTW2====================");
           moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets = moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets.slice(0,entries);//xxx slice efficient enough?!
+          self.dumpSTCO(mp4, trak);
         }
         
 
@@ -586,10 +621,12 @@ size2=xxx.bytelength;
       log("shifting offsets by " + offset);
       
       // moov_shift_offsets_inplace(moov, offset);
+      self.dumpSTCO(mp4boxHdr);
       for (var trak in moov.traks){
         for (var i=0; i < moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets.length; i++)
           moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[i] += offset;
       }//end for (var trak in moov.traks)
+      self.dumpSTCO(mp4boxHdr);
       
       
       //create_traffic_shaping(moov, ... //xxx ??!
@@ -612,6 +649,6 @@ size2=xxx.bytelength;
 
 jQuery(function(){
   // on dom ready...
-//  mp4cut = new MP4cut();
-  mp4cut = new MP4cut('commute.mp4', 0, 120); //10, 20);//xxx
+  mp4cut = new MP4cut('commute.mp4', 10, 20);
+  //mp4cut = new MP4cut('commute.mp4');
 });
