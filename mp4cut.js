@@ -28,10 +28,15 @@ size2=xxx.bytelength;
   function MP4cut(FILE, START, END){
     if (!FILE)
       FILE = 'http://ia600301.us.archive.org/cors_get.php?path=/27/items/stairs/stairs.mp4';
+    if (!START)
+      START=0;
+    if (!END)
+      END=10800;//xxx
 
     const SEGMENT_NUMBER_SAMPLES = 1000;
     const DOWNLOADER_CHUNK_SIZE = (FILE=='commute.mp4' ? 2000000 : 100000); // ~1.9MB
     const autoplay = true;
+    const REWRITE = false;
 
     var FETCH_ENTIRE_FILE = false;
     var video = false;
@@ -274,13 +279,13 @@ size2=xxx.bytelength;
           self.initializeSourceBuffersAndSegmentation(info);
         */
         
-        // (NOTE: tracey extending downloader w/ instance var)
-        downloader.nextStart = 0;
+
+        var nextStart = 0;
         if (response){
           if (inMSE)
-            downloader.nextStart = mp4box.appendBuffer(response);
+            nextStart = mp4box.appendBuffer(response);
           else
-            downloader.nextStart = mp4boxHdr.appendBuffer(response);
+            nextStart = mp4boxHdr.appendBuffer(response);
         }
      
         if (end){
@@ -302,18 +307,33 @@ size2=xxx.bytelength;
             // Set the next chunk we will download to there, and keep going,
             // writing the rest of the mp4 file to the *NEW* mp4box var
             // (which will be writing to MediaSource and thus our <video> tag).
-            mp4box.appendBuffer(mp4boxHdr.inputStream.buffers[0]);
             origHeaderSize = mp4boxHdr.inputStream.buffers[0].usedBytes;
-            log('HEADER SIZE: ' + origHeaderSize);
-            downloader.nextStart = origHeaderSize;
-            downloader.setChunkStart(downloader.nextStart);
+            var skip_from_start = 0;
+            if (REWRITE){
+              // REWRITE THE HEADER!
+              skip_from_start = self.cut();
+              // write new header to a DataStream / buffer (xxx this could prolly be more efficient)
+              var xxx=new DataStream();
+              xxx.endianness = DataStream.BIG_ENDIAN;  
+              mp4boxHdr.inputIsoFile.moov.write(xxx);
+              xxx._buffer.fileStart = 0; //xxx ugh
+              mp4box.appendBuffer(xxx._buffer);
+              // xxx.byteLength  // new header size!
+            }
+            else {
+              mp4box.appendBuffer(mp4boxHdr.inputStream.buffers[0]);
+            }
+            log('ORIG HEADER SIZE: ' + origHeaderSize);
+            nextStart = origHeaderSize + skip_from_start;
+            log('NEXT START: ' + nextStart);
+            downloader.setChunkStart(nextStart);
             FETCH_ENTIRE_FILE = true;
             inMSE = true;
             downloader.resume();
           }
           else{
-            log('DL fetching '+FILE+' bytes starting at: ' + downloader.nextStart);
-            downloader.setChunkStart(downloader.nextStart);
+            log('DL fetching '+FILE+' bytes starting at: ' + nextStart);
+            downloader.setChunkStart(nextStart);
           }
         }     
         if (error)
@@ -565,6 +585,8 @@ size2=xxx.bytelength;
       
       
       //create_traffic_shaping(moov, ... //xxx ??!
+
+      return skip_from_start;
     };//end self.cut
 
 
@@ -582,5 +604,6 @@ size2=xxx.bytelength;
 
 jQuery(function(){
   // on dom ready...
-  mp4cut = new MP4cut('commute.mp4', 10, 20); //10, 20);//xxx
+//  mp4cut = new MP4cut();
+  mp4cut = new MP4cut('commute.mp4', 0, 120); //10, 20);//xxx
 });
