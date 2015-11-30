@@ -20,6 +20,14 @@ size2=xxx.bytelength;
 - xhr dump start/end range
 
 
+ # to build your own tailored mp4box.js:
+ git clone git@github.com:gpac/mp4box.js.git;
+ brew install npm;
+ npm install -g grunt-cli;
+ cd mp4box.js;
+ npm install;
+ grunt;
+
 */
 
 
