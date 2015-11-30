@@ -8,7 +8,7 @@
     <!--
     <script src="../mp4box.all.js"></script>
     <script src="../mp4box.js/test/downloader.js"></script>
-    -->
+ 1;95;0c   -->
   </head>
   <body>
     <h1>mp4cut.js -- JS/clientside based clipping of an .mp4 file - rewrites header and only (losslessly) sends desired A/V packets for the desired start/end range</h1>
@@ -21,156 +21,8 @@
 
     <hr/>
     <div id="log" style="font-family:monospace; white-space:pre"><b>LOG:</b><br/></div>
-<script>
- /*
-    # to build your own tailored mp4box.js:
- git clone git@github.com:gpac/mp4box.js.git;
- brew install npm;
- npm install -g grunt-cli;
- cd mp4box.js;
- npm install;
- grunt;
- */
-
- var FI='http://ia600301.us.archive.org/cors_get.php?path=/27/items/stairs/stairs.mp4';
-//FI='stairs.mp4';
- var START=10;
- var END=20;
- var FETCH_ENTIRE_FILE=true;
- var fragment=false;
-
- var mimeCodec = 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"';
-
- if (!fragment){
- window.mediaSource = new MediaSource();
- mediaSource.append = function(buffer){ // NOTE: tracey added function
-   if (!mediaSource.started){
-     mediaSource.started = true;//NOTE: this is *us* extending the object
-     var video = document.querySelector('video');
-     video.src = URL.createObjectURL(mediaSource);
-     mediaSource.addEventListener('sourceopen', function(){
-       log('mediaSource sourceopen()');
-       mediaSource.sourceBuffer = mediaSource.addSourceBuffer(mimeCodec);//NOTE: this is *us* extending the object   
-       mediaSource.sourceBuffer.appendBuffer(buffer);
-     });
-   }
-   else {
-     mediaSource.sourceBuffer.appendBuffer(buffer);
-   }
- };
- }
-
- 
- //FI='COMW_20130726_023000_The_Daily_Show_With_Jon_Stewart.mp4';
- //START=1207;
- //END=START + 30;
-
-//Log.setLogLevel(Log.debug);
-Log.setLogLevel(Log.info);
-
- var log=function(){
-   for (arg in arguments)
-     $('#log').append(arguments[arg]+"\n");
-   if (typeof(console)=='undefined')
-     return;
-   console.log(arguments);
- };
 
 
-
- 
- 
- window.mp4box = new MP4Box();
- mp4box.onMoovStart = function () {
-   log("Starting to receive File Information");
- }
- mp4box.onError = function(e) {
-   log("error:");
-   log(e);
- };
- mp4box.onReady = function(info) {
-   log("onReady info:");
-   log(info);
-
-
-   if (fragment){
-
-     mp4box.onSegment = function (id, user, buffer) {
-       log("Received segment on track "+id+" for object "+user+" with a length of "+buffer.byteLength);
-     }
-     
-     for (var trak in mp4box.getInfo().tracks){
-       mp4box.setSegmentOptions(mp4box.getInfo().tracks[trak].id, "xxxx"/*{sb:mediaSource.sourceBuffer}*/,  {rapAlignment:true});
-       log('setseg on trak:'+trak+', id:'+mp4box.getInfo().tracks[trak].id);
-     }
-     
-     /*
-     // mp4box.createSingleSampleMoof  ?? xxxx
-     mp4box.createFragment('xxx ignored??',
-                           1, //track_id
-                           3 //sampleNumber
-     );
-      */
-
-     mp4box.xxxseg = mp4box.initializeSegmentation();
-     mp4box.start();
-
-     log('fragmentedTracks:');
-     log(mp4box.fragmentedTracks);
-     //mediaSource.append(mp4box.writeFile()); //xxxxxxxx
-     //mediaSource.append(mp4box.xxxseg[0].buffer); //xxxxxxxx
-     //mediaSource.append(mp4box.xxxseg[1].buffer); //xxxxxxxx
-     
-     log('what the frag?');
-     return;
-   }
-   
-   
-//log("SEEK ME"); log(mp4box.seek(10, true)); return;//xxxxxxxxxx
-//   mediaSource.append(mp4box.writeFile()); return; //xxxxxxxx
-     
-   
-
- };//end mp4box.onReady..
-
-
- 
- 
-
-
- var downloader = new Downloader();
- downloader.setInterval(100);
- downloader.setChunkSize(2000000);
- downloader.setUrl(FI);
- downloader.start();
-
- downloader.setCallback(
-   function (response, end, error) { 
-     log('DL callback()');
-     log('end: '+end);
-     var nextStart = 0;
-     if (response){
-       nextStart = mp4box.appendBuffer(response);
-       //mediaSource.append(response);
-     }
-     
-     if (end){
-       mp4box.flush();
-//mediaSource.append(mp4box.writeFile()); //xxxxxxxx
-     }
-     else {
-       if (!FETCH_ENTIRE_FILE  &&  mp4box.readySent)
-         downloader.stop();
-       else
-         downloader.setChunkStart(nextStart);
-     }     
-     if (error)
-       reset();
-   }
- );
-
-
-
-</script>
-</body>
+    <script src="mp4cut.js"></script>
+  </body>
 </html>
