@@ -321,245 +321,245 @@ size2=xxx.bytelength;
       window.moov = mp4box.inputIsoFile.moov;//xxxx
       window.mdat = mp4box.inputIsoFile.mdats[0];//xxxx
       var moov_time_scale = moov.mvhd.timescale;
-
-   var nearestKeyframe=0;
-   var nearestKeyframeTrak=-1;
-   var starts=[]; // NOTE: these become starting sample *NUMBER* (not time!) for each track
-   var ends=[];   // NOTE: these become ending   sample *NUMBER* (not time!) for each track
-   for (var trak in moov.traks){
-     log('================== NEW TRAK ===================');
-     var trak_time_scale = moov.traks[trak].mdia.mdhd.timescale;
-     log('stco (chunk offsets)');
-     //log(moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets);
-     log('stts (time to sample) (always len 1 for IA vids):');
-     log(moov.traks[trak].mdia.minf.stbl.stts);
-
-     var duration = moov.traks[trak].mdia.minf.stbl.stts.sample_deltas[0]; //xxx may need to expand for non-IA (they have just 1)...
-     var duration_time = duration / trak_time_scale; //eg: 100/2997
-
-
-     // find the actually wanted start and end, after initing to max range
-     starts[trak] = 0;
-     ends[trak] = moov.traks[trak].samples.length-1;
-     for (var i=0; i < moov.traks[trak].samples.length; i++){
-       var pts = i * duration / trak_time_scale;
-       if (pts <= START)
-         starts[trak] = i;
-       if (pts <= END)
-         ends[trak] = i;
-       else if (pts > END)
-         break;
-     }
-     
-
-
-     // now for the video track, adjust ITS start to the nearest keyframe BEFORE OR AT it
-     if (moov.traks[trak].mdia.minf.stbl.stss){
-       log('moov_time_scale:'+moov_time_scale);
-       log('trak_time_scale:'+trak_time_scale);
-       log('stss (list of video keyframes)');
-       log(moov.traks[trak].mdia.minf.stbl.stss.sample_numbers);
-       var sample_numbers=moov.traks[trak].mdia.minf.stbl.stss.sample_numbers;
-       for (var i in sample_numbers){
-         // pts:  179*100/2997 ==> 5.972639305972639
-         var pts=(sample_numbers[i]-1) * duration / trak_time_scale;//xxx check the -1 math, etc.
-         if (pts <= START){
-           nearestKeyframeTrak = trak;
-           nearestKeyframe = sample_numbers[i];
-         }
-         else{
-           break;
-         }
-           
-         log('keyframe #: '+i+', val='+sample_numbers[i]+', pts='+pts);
-       }
-       log('nearestKeyframe: '    + nearestKeyframe); // xxx this is a sample NUMBER (not time)!
-     }
-   }//end for (var trak in moov.traks)
+      
+      var nearestKeyframe=0;
+      var nearestKeyframeTrak=-1;
+      var starts=[]; // NOTE: these become starting sample *NUMBER* (not time!) for each track
+      var ends=[];   // NOTE: these become ending   sample *NUMBER* (not time!) for each track
+      for (var trak in moov.traks){
+        log('================== NEW TRAK ===================');
+        var trak_time_scale = moov.traks[trak].mdia.mdhd.timescale;
+        log('stco (chunk offsets)');
+        //log(moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets);
+        log('stts (time to sample) (always len 1 for IA vids):');
+        log(moov.traks[trak].mdia.minf.stbl.stts);
+        
+        var duration = moov.traks[trak].mdia.minf.stbl.stts.sample_deltas[0]; //xxx may need to expand for non-IA (they have just 1)...
+        var duration_time = duration / trak_time_scale; //eg: 100/2997
+        
+        
+        // find the actually wanted start and end, after initing to max range
+        starts[trak] = 0;
+        ends[trak] = moov.traks[trak].samples.length-1;
+        for (var i=0; i < moov.traks[trak].samples.length; i++){
+          var pts = i * duration / trak_time_scale;
+          if (pts <= START)
+            starts[trak] = i;
+          if (pts <= END)
+            ends[trak] = i;
+          else if (pts > END)
+            break;
+        }
+        
+        
+        
+        // now for the video track, adjust ITS start to the nearest keyframe BEFORE OR AT it
+        if (moov.traks[trak].mdia.minf.stbl.stss){
+          log('moov_time_scale:'+moov_time_scale);
+          log('trak_time_scale:'+trak_time_scale);
+          log('stss (list of video keyframes)');
+          log(moov.traks[trak].mdia.minf.stbl.stss.sample_numbers);
+          var sample_numbers=moov.traks[trak].mdia.minf.stbl.stss.sample_numbers;
+          for (var i in sample_numbers){
+            // pts:  179*100/2997 ==> 5.972639305972639
+            var pts=(sample_numbers[i]-1) * duration / trak_time_scale;//xxx check the -1 math, etc.
+            if (pts <= START){
+              nearestKeyframeTrak = trak;
+              nearestKeyframe = sample_numbers[i];
+            }
+            else{
+              break;
+            }
+            
+            log('keyframe #: '+i+', val='+sample_numbers[i]+', pts='+pts);
+          }
+          log('nearestKeyframe: '    + nearestKeyframe); // xxx this is a sample NUMBER (not time)!
+        }
+      }//end for (var trak in moov.traks)
 
 
    
-
-   if (nearestKeyframeTrak >= 0){
-     // means we found the best VIDEO KEYFRAME to sync start to above -- we'll use that!
-     log('STARTS: ');log(starts);
-     starts[nearestKeyframeTrak] = nearestKeyframe;
-   }
-   log('STARTS: ');log(starts);
-   log('ENDS: '  );log(ends);
-
-
-   if (0 && "xxx"){
-     starts=[272,391];
-     ends=[521,749];
-     log('STARTS: ');log(starts);
-     log('ENDS: '  );log(ends);
-   }
+      
+      if (nearestKeyframeTrak >= 0){
+        // means we found the best VIDEO KEYFRAME to sync start to above -- we'll use that!
+        log('STARTS: ');log(starts);
+        starts[nearestKeyframeTrak] = nearestKeyframe;
+      }
+      log('STARTS: ');log(starts);
+      log('ENDS: '  );log(ends);
+      
+      
+      if (0 && "xxx"){
+        starts=[272,391];
+        ends=[521,749];
+        log('STARTS: ');log(starts);
+        log('ENDS: '  );log(ends);
+      }
    
    
 
 
-   var moov_duration = 0;
-   var end_offset = 0;
-   var skip_from_start = Number.MAX_VALUE;
-   var mdat_start = mdat.start;//xxxx
-   var mdat_size = mdat.size;//xxxx
-   for (var trak in moov.traks){
-     var start = starts[trak];
-     var end   = ends[trak];
-     
-     var skip = (moov.traks[trak].samples[start].offset -
-                 moov.traks[trak].samples[0].offset);
-     if (skip < skip_from_start)
-       skip_from_start = skip;
-     log('CAN SKIP '+skip+' BYTES!');
+      var moov_duration = 0;
+      var end_offset = 0;
+      var skip_from_start = Number.MAX_VALUE;
+      var mdat_start = mdat.start;//xxxx
+      var mdat_size = mdat.size;//xxxx
+      for (var trak in moov.traks){
+        var start = starts[trak];
+        var end   = ends[trak];
+        
+        var skip = (moov.traks[trak].samples[start].offset -
+                    moov.traks[trak].samples[0].offset);
+        if (skip < skip_from_start)
+          skip_from_start = skip;
+        log('CAN SKIP '+skip+' BYTES!');
+        
+        if ((end+1) < moov.traks[trak].samples.length){
+          var end_pos = moov.traks[trak].samples[end].offset;
+          if(end_pos > end_offset)
+            end_offset = end_pos;
+          log("New endpos=" + end_pos);
+          log("Trak can skip "+(mdat_start + mdat_size - end_offset)+" bytes at end");
+        }
+        
+        // adust STTS
+        if (moov.traks[trak].mdia.minf.stbl.stts){
+          var samples = moov.traks[trak].samples;
+          var entries = 0;
+          var s = start;
+          var sample_counts=[];
+          var sample_deltas=[];
+          while (s != end){
+            var sample_count=1;
+            //log(s+' -v- '+end);
+            var sample_duration = samples[s+1].dts - samples[s].dts;
+            while ((++s) < end){
+              //log(s+' -v- '+end);
+              if ((samples[s+1].dts - samples[s].dts) != sample_duration){
+                alert('xxx');
+                break;
+              }
+              ++sample_count;
+            }
+            
+            sample_counts[entries] = sample_count;
+            sample_deltas[entries] = sample_duration;
+            entries++;
+          }
+          moov.traks[trak].mdia.minf.stbl.stts.sample_counts = sample_counts;
+          moov.traks[trak].mdia.minf.stbl.stts.sample_deltas = sample_deltas;
+        }
 
-     if ((end+1) < moov.traks[trak].samples.length){
-       var end_pos = moov.traks[trak].samples[end].offset;
-        if(end_pos > end_offset)
-          end_offset = end_pos;
-        log("New endpos=" + end_pos);
-        log("Trak can skip "+(mdat_start + mdat_size - end_offset)+" bytes at end");
-     }
-     
-     // adust STTS
-     if (moov.traks[trak].mdia.minf.stbl.stts){
-       var samples = moov.traks[trak].samples;
-       var entries = 0;
-       var s = start;
-       var sample_counts=[];
-       var sample_deltas=[];
-       while (s != end){
-         var sample_count=1;
-         //log(s+' -v- '+end);
-         var sample_duration = samples[s+1].dts - samples[s].dts;
-         while ((++s) < end){
-           //log(s+' -v- '+end);
-           if ((samples[s+1].dts - samples[s].dts) != sample_duration){
-             alert('xxx');
-             break;
-           }
-           ++sample_count;
-         }
+        // adjust CTTS
+        if (moov.traks[trak].mdia.minf.stbl.ctts) alert("need to update CTTS!");
 
-         sample_counts[entries] = sample_count;
-         sample_deltas[entries] = sample_duration;
-         entries++;
-       }
-       moov.traks[trak].mdia.minf.stbl.stts.sample_counts = sample_counts;
-       moov.traks[trak].mdia.minf.stbl.stts.sample_deltas = sample_deltas;
-     }
+        // adjust STSC (chunkmap) and STCO (chunk offsets)
+        if (moov.traks[trak].mdia.minf.stbl.stsc){
+          var stsc = moov.traks[trak].mdia.minf.stbl.stsc;
+          
+          // find the chunk that has the desired start sample in it
+          var chunk_start=0;
+          if (!stsc.first_chunk.length  &&
+              !stsc.samples_per_chunk.length  &&
+              !stsc.sample_description_index.length){
+            // eg: MP4Box -dash 10000 -rap -frag-rap c.mp4
+          }
+          else{
+            // eg: normal IA video
+            for (var nChunks=stsc.samples_per_chunk.length/*xxx verify!*/;   chunk_start < nChunks; chunk_start++){
+              if (stsc.first_chunk[nChunks] + stsc.samples_per_chunk[nChunks] > start)
+                break; // found the right chunk!
+            }
+            if (stsc.first_chunk.length!=1  ||  stsc.first_chunk[0]!=1  ||
+                stsc.samples_per_chunk.length!=1  ||  stsc.samples_per_chunk[0]!=1  ||
+                stsc.sample_description_index.length!=1  ||  stsc.sample_description_index[0]!=1){
+              alert('cant be this lazy tracey STSC needs work xxx!');
+            }
+          }
+          var chunk_end=moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets.length;//xxx (see above alert!)
+          var entries=0;
+          for (var i=chunk_start; i < chunk_end; i++){
+            moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[entries] =
+            moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[i]; // xxx need to subtract amount of header we will shrink down by  *PLUS*  the first byte jump distance between orig vs ne A/V packets...
+            entries++;
+          }
+          moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets = moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets.slice(0,entries);//xxx slice efficient enough?!
+        }
+        
 
-     // adjust CTTS
-     if (moov.traks[trak].mdia.minf.stbl.ctts) alert("need to update CTTS!");
-
-     // adjust STSC (chunkmap) and STCO (chunk offsets)
-     if (moov.traks[trak].mdia.minf.stbl.stsc){
-       var stsc = moov.traks[trak].mdia.minf.stbl.stsc;
-       
-       // find the chunk that has the desired start sample in it
-       var chunk_start=0;
-       if (!stsc.first_chunk.length  &&
-           !stsc.samples_per_chunk.length  &&
-           !stsc.sample_description_index.length){
-         // eg: MP4Box -dash 10000 -rap -frag-rap c.mp4
-       }
-       else{
-         // eg: normal IA video
-         for (var nChunks=stsc.samples_per_chunk.length/*xxx verify!*/;   chunk_start < nChunks; chunk_start++){
-           if (stsc.first_chunk[nChunks] + stsc.samples_per_chunk[nChunks] > start)
-             break; // found the right chunk!
-         }
-         if (stsc.first_chunk.length!=1  ||  stsc.first_chunk[0]!=1  ||
-             stsc.samples_per_chunk.length!=1  ||  stsc.samples_per_chunk[0]!=1  ||
-             stsc.sample_description_index.length!=1  ||  stsc.sample_description_index[0]!=1){
-           alert('cant be this lazy tracey STSC needs work xxx!');
-         }
-       }
-       var chunk_end=moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets.length;//xxx (see above alert!)
-       var entries=0;
-       for (var i=chunk_start; i < chunk_end; i++){
-         moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[entries] =
-         moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[i]; // xxx need to subtract amount of header we will shrink down by  *PLUS*  the first byte jump distance between orig vs ne A/V packets...
-         entries++;
-       }
-       moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets = moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets.slice(0,entries);//xxx slice efficient enough?!
-     }
-     
-
-     // adjust STSS (sync samples)
-     if (moov.traks[trak].mdia.minf.stbl.stss){
-       var stss = moov.traks[trak].mdia.minf.stbl.stss;
-       var i=0;
-       var entries=0;
-       for (; i < stss.sample_numbers.length; i++){
-         var sync_sample = stss.sample_numbers[i];
-         if (sync_sample >= end + 1)
-           break;
-         moov.traks[trak].mdia.minf.stbl.stss.sample_numbers[entries++] =
-           sync_sample - start;
-       }
-       moov.traks[trak].mdia.minf.stbl.stss.sample_numbers = moov.traks[trak].mdia.minf.stbl.stss.sample_numbers.slice(0,entries);//xxx slice efficient enough?!
-     }
-
-
-     // adjust STSZ (sample sizes)
-     if (moov.traks[trak].mdia.minf.stbl.stsz){
-       var stsz = moov.traks[trak].mdia.minf.stbl.stsz;
-       if (stsz.sample_sizes.length){
-         var entries=0;
-         for (var i=start; i < end; i++)
-           moov.traks[trak].mdia.minf.stbl.stsz.sample_sizes[entries++] = stsz.sample_sizes[i];
-         moov.traks[trak].mdia.minf.stbl.stsz.sample_sizes = moov.traks[trak].mdia.minf.stbl.stsz.sample_sizes.slice(0,entries);//xxx slice efficient enough?!
-       }
-     }     
+        // adjust STSS (sync samples)
+        if (moov.traks[trak].mdia.minf.stbl.stss){
+          var stss = moov.traks[trak].mdia.minf.stbl.stss;
+          var i=0;
+          var entries=0;
+          for (; i < stss.sample_numbers.length; i++){
+            var sync_sample = stss.sample_numbers[i];
+            if (sync_sample >= end + 1)
+              break;
+            moov.traks[trak].mdia.minf.stbl.stss.sample_numbers[entries++] =
+              sync_sample - start;
+          }
+          moov.traks[trak].mdia.minf.stbl.stss.sample_numbers = moov.traks[trak].mdia.minf.stbl.stss.sample_numbers.slice(0,entries);//xxx slice efficient enough?!
+        }
 
 
-     // fixup trak (duration)
-     var trak_duration = stts_get_duration(moov.traks[trak].mdia.minf.stbl.stts);
-     var trak_time_scale =  moov.traks[trak].mdia.mdhd.timescale;
-     {
-       var duration = trak_time_to_moov_time(trak_duration, moov_time_scale, trak_time_scale);
-       moov.traks[trak].mdia.mdhd.duration = trak_duration;
-       moov.traks[trak].tkhd.duration = duration;
-       log('trak: new duration: ' + duration);
-       
-       if (duration > moov_duration)
-         moov_duration = duration;
-     }
-   }//end for (var trak in moov.traks)
+        // adjust STSZ (sample sizes)
+        if (moov.traks[trak].mdia.minf.stbl.stsz){
+          var stsz = moov.traks[trak].mdia.minf.stbl.stsz;
+          if (stsz.sample_sizes.length){
+            var entries=0;
+            for (var i=start; i < end; i++)
+              moov.traks[trak].mdia.minf.stbl.stsz.sample_sizes[entries++] = stsz.sample_sizes[i];
+            moov.traks[trak].mdia.minf.stbl.stsz.sample_sizes = moov.traks[trak].mdia.minf.stbl.stsz.sample_sizes.slice(0,entries);//xxx slice efficient enough?!
+          }
+        }     
 
 
-   moov.mvhd.duration = moov_duration;
-   log("moov: new_duration="+(moov_duration / moov_time_scale)+" seconds");
+        // fixup trak (duration)
+        var trak_duration = self.stts_get_duration(moov.traks[trak].mdia.minf.stbl.stts);
+        var trak_time_scale =  moov.traks[trak].mdia.mdhd.timescale;
+        {
+          var duration = self.trak_time_to_moov_time(trak_duration, moov_time_scale, trak_time_scale);
+          moov.traks[trak].mdia.mdhd.duration = trak_duration;
+          moov.traks[trak].tkhd.duration = duration;
+          log('trak: new duration: ' + duration);
+          
+          if (duration > moov_duration)
+            moov_duration = duration;
+        }
+      }//end for (var trak in moov.traks)
 
-   // subtract bytes we skip at the front of the mdat atom
-   var offset = 0 - skip_from_start;
-   log("shifting offsets by " + offset);   
-   
-   log("moov: writing header");
 
-   // compute moov header size
-   var tmpxxx = mp4box.writeFile();
-   var moov_size = tmpxxx.byteLength;
-   log("moov size: "+moov_size);
-   delete tmpxxx;
-   
-   // add new moov size
-   offset += moov_size;
-   log("shifting offsets by " + offset);
-   
-   // moov_shift_offsets_inplace(moov, offset);
-   for (var trak in moov.traks){
-     for (var i=0; i < moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets.length; i++)
-       moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[i] += offset;
-   }//end for (var trak in moov.traks)
-   
-   
-   //create_traffic_shaping(moov, ... //xxx ??!
-    
+      moov.mvhd.duration = moov_duration;
+      log("moov: new_duration="+(moov_duration / moov_time_scale)+" seconds");
 
+      // subtract bytes we skip at the front of the mdat atom
+      var offset = 0 - skip_from_start;
+      log("shifting offsets by " + offset);   
+      
+      log("moov: writing header");
+
+      // compute moov header size
+      var tmpxxx = mp4box.writeFile();
+      var moov_size = tmpxxx.byteLength;
+      log("moov size: "+moov_size);
+      delete tmpxxx;
+      
+      // add new moov size
+      offset += moov_size;
+      log("shifting offsets by " + offset);
+      
+      // moov_shift_offsets_inplace(moov, offset);
+      for (var trak in moov.traks){
+        for (var i=0; i < moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets.length; i++)
+          moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[i] += offset;
+      }//end for (var trak in moov.traks)
+      
+      
+      //create_traffic_shaping(moov, ... //xxx ??!
     };//end self.cut
+
+
   }//end function MP4cut..
 
 
@@ -571,7 +571,8 @@ size2=xxx.bytelength;
 }( jQuery ));
 
 
-$(function(){
+
+jQuery(function(){
   // on dom ready...
-  new MP4cut('commute.mp4', 10, 20);
+  mp4cut = new MP4cut('commute.mp4', 10, 20);
 });
