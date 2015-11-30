@@ -3,6 +3,7 @@
 /*
 TODO:
 
+xxxx   is downloader -ing 2x!
 xxx=mp4box.writeFile(); // to write moov
 size1=xxx.bytelength;
 // ... update header
@@ -27,23 +28,22 @@ size2=xxx.bytelength;
   function MP4cut(FILE, START, END){
     if (!FILE)
       FILE = 'http://ia600301.us.archive.org/cors_get.php?path=/27/items/stairs/stairs.mp4';
-    const fragment=false;
 
     const SEGMENT_NUMBER_SAMPLES = 1000;
-    var   FETCH_ENTIRE_FILE = false;
-    const FI='commute.mp4';
-    //const FI='stairs.mp4';
-    const DOWNLOADER_CHUNK_SIZE = (FI=='commute.mp4' ? 2000000 : 100000); // ~1.9MB
+    const DOWNLOADER_CHUNK_SIZE = (FILE=='commute.mp4' ? 2000000 : 100000); // ~1.9MB
     const autoplay = true;
+
+    var FETCH_ENTIRE_FILE = false;
     var video = false;
     var inMSE = false;
+    window.origHeaderSize = 0;//xxx
     var self = this;
     
     var mediaSource = new MediaSource();
-    if (FI=='stairs.mp4')
-      Log.setLogLevel(Log.debug);
-    else
+    if (FILE=='commute.mp4')
       Log.setLogLevel(Log.info);
+    else
+      Log.setLogLevel(Log.debug);
     
     var log=function(){
       for (arg in arguments)
@@ -52,12 +52,15 @@ size2=xxx.bytelength;
         return;
       console.log(arguments);
     };
-    log('FILE: '+FI);
-
-    
+    log('FILE: '+FILE);
 
 
-    // helper method
+
+    self.debug = function(){
+      debugger;
+    };
+
+
     self.stts_get_duration = function(stts){
       var duration = 0;
       for(var i=0; i < stts.sample_counts.length; i++)
@@ -65,7 +68,7 @@ size2=xxx.bytelength;
       return duration;
     };
     
-    // helper method
+
     self.trak_time_to_moov_time = function(t, moov_time_scale, trak_time_scale){
       return t * moov_time_scale / trak_time_scale;
     };
@@ -234,7 +237,7 @@ size2=xxx.bytelength;
     var downloader = new Downloader();
     downloader.setInterval(100);
     downloader.setChunkSize(DOWNLOADER_CHUNK_SIZE);
-    downloader.setUrl(FI);
+    downloader.setUrl(FILE);
     downloader.start();
 
 
@@ -254,8 +257,12 @@ size2=xxx.bytelength;
           
           before all flush() change things
           mp4box.inputStream.buffers[0].usedBytes *seems* to be the header and size of it...
+
+
+
+          s=new DataStream();  s.endianness=DataStream.BIG_ENDIAN;  x=mp4boxHdr.inputIsoFile.moov.write(s);  s.byteLength
           
-          
+
           
           once readySent() (have (just) header):
           MSE setup
@@ -296,16 +303,16 @@ size2=xxx.bytelength;
             // writing the rest of the mp4 file to the *NEW* mp4box var
             // (which will be writing to MediaSource and thus our <video> tag).
             mp4box.appendBuffer(mp4boxHdr.inputStream.buffers[0]);
-            var headerSize = mp4boxHdr.inputStream.buffers[0].usedBytes;
-            log('HEADER SIZE: ' + headerSize);
-            downloader.nextStart = headerSize;
+            origHeaderSize = mp4boxHdr.inputStream.buffers[0].usedBytes;
+            log('HEADER SIZE: ' + origHeaderSize);
+            downloader.nextStart = origHeaderSize;
             downloader.setChunkStart(downloader.nextStart);
             FETCH_ENTIRE_FILE = true;
             inMSE = true;
             downloader.resume();
           }
           else{
-            log('DL fetching '+FI+' bytes starting at: ' + downloader.nextStart);
+            log('DL fetching '+FILE+' bytes starting at: ' + downloader.nextStart);
             downloader.setChunkStart(downloader.nextStart);
           }
         }     
@@ -318,8 +325,9 @@ size2=xxx.bytelength;
     
 
     self.cut = function(){
-      window.moov = mp4box.inputIsoFile.moov;//xxxx
-      window.mdat = mp4box.inputIsoFile.mdats[0];//xxxx
+      var mp4 = mp4boxHdr;//xxx
+      window.moov = mp4.inputIsoFile.moov;//xxxx
+      window.mdat = mp4.inputIsoFile.mdats[0];//xxxx
       var moov_time_scale = moov.mvhd.timescale;
       
       var nearestKeyframe=0;
@@ -540,7 +548,7 @@ size2=xxx.bytelength;
       log("moov: writing header");
 
       // compute moov header size
-      var tmpxxx = mp4box.writeFile();
+      var tmpxxx = mp4.writeFile();
       var moov_size = tmpxxx.byteLength;
       log("moov size: "+moov_size);
       delete tmpxxx;
@@ -574,5 +582,5 @@ size2=xxx.bytelength;
 
 jQuery(function(){
   // on dom ready...
-  mp4cut = new MP4cut('commute.mp4', 10, 20);
+  mp4cut = new MP4cut('commute.mp4', 10, 20); //10, 20);//xxx
 });
