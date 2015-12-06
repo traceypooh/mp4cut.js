@@ -55,8 +55,11 @@ function ablog(buffer){
 (function( $ ) {
 
   function MP4cut(FILE, START, END){
-    if (!FILE)
+    if (!FILE){
       FILE = 'http://ia600301.us.archive.org/cors_get.php?path=/27/items/stairs/stairs.mp4';
+      FILE = 'http://ia600404.us.archive.org/cors_get.php?paht=/22/items/commute/commute.mp4';
+    }
+    
     if (!START)
       START=0;
     if (!END)
@@ -714,6 +717,9 @@ log('APPENDED  TO NEW mp4box');
 jQuery(function(){
   // on dom ready...
   //mp4cut = new MP4cut('commute.mp4', 10, 20);
-  mp4cut = new MP4cut('commute.mp4', 0, 3);
   //mp4cut = new MP4cut('commute.mp4');
+  if (location.hostname=='localhost')
+    mp4cut = new MP4cut('commute.mp4', 0, 3);
+  else
+    mp4cut = new MP4cut();
 });
