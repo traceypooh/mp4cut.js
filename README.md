@@ -12,5 +12,5 @@ Here's the gist of the idea and what this does.  For a given mp4 video, instead 
 * (losslessly) append the wanted A/V buffer of bytes to the MediaSource/video tag
 
 
-See the demonstration page:
+### See the demonstration page:
 * http://htmlpreview.github.io/?https://github.com/traceypooh/mp4cut.js/blob/master/index.html
