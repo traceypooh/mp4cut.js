@@ -56,8 +56,8 @@ function ablog(buffer){
 
   function MP4cut(FILE, START, END){
     if (!FILE){
-      FILE = 'http://ia600301.us.archive.org/cors_get.php?path=/27/items/stairs/stairs.mp4';
-      FILE = 'http://ia600404.us.archive.org/cors_get.php?path=/22/items/commute/commute.mp4';
+      FILE = 'http://ia600301.us.archive.org/~tracey/cors_get.php?path=/27/items/stairs/stairs.mp4';
+      FILE = 'http://ia600404.us.archive.org/~tracey/cors_get.php?path=/22/items/commute/commute.mp4';
     }
     
     if (!START)
