@@ -1,17 +1,5 @@
-/* main functions, MSE-related */
 
 /*
-TODO:
-
-xxxx   is downloader -ing 2x!
-xxx=mp4box.writeFile(); // to write moov
-size1=xxx.bytelength;
-// ... update header
-xxx=mp4box.writeFile(); // to write moov
-size2=xxx.bytelength;
-// the difference + (samples[start].offset - samples[0].offset)  should be the difference!
-
-
 
 - read mp4 header
 - determine seek pts
@@ -30,6 +18,39 @@ size2=xxx.bytelength;
 
 */
 
+function ab2str(buf) {
+  return String.fromCharCode.apply(null, new Uint16Array(buf));
+}
+
+function str2ab(str) {
+  var buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
+  var bufView = new Uint16Array(buf);
+  for (var i=0, strLen=str.length; i<strLen; i++) {
+    bufView[i] = str.charCodeAt(i);
+  }
+  return buf;
+}
+
+function ablog(buffer){
+  var bufView = new Uint8Array(buffer);
+  var length = bufView.length;
+  var result = '';
+  console.log(buffer);
+  console.log('AB length: ' + length);
+  length2 = Math.min(2000, length);//xxx
+  for(var i=0; i < length2; i+=65535){
+    var addition = 65535;
+    if(i + 65535 > length2)
+      addition = length2 - i;
+    result += String.fromCharCode.apply(null, bufView.subarray(i,i+addition));
+  }
+  if(!result)
+    console.log('buffer was invalid');
+  
+  console.log(result);
+  return length;
+}
+
 
 (function( $ ) {
 
@@ -45,11 +66,11 @@ size2=xxx.bytelength;
     const DOWNLOADER_CHUNK_SIZE = (FILE=='commute.mp4' ? 2000000 : 100000); // ~1.9MB
     const autoplay = true;
     const REWRITE = false;//xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    const FKING_FAIL = true;
 
     var FETCH_ENTIRE_FILE = false;
     var video = false;
     var inMSE = false;
-    window.origHeaderSize = 0;//xxx
     var self = this;
     
     var mediaSource = new MediaSource();
@@ -229,7 +250,7 @@ size2=xxx.bytelength;
     video.play();
  
     window.mp4boxHdr = new MP4Box();//xxx
-    window.mp4box    = new MP4Box();//xxx
+    window.mp4box    = null;//xxx
     mp4boxHdr.onMoovStart = function () {
       log("HDR Starting to receive File Information");
     }
@@ -243,75 +264,63 @@ size2=xxx.bytelength;
     };
 
 
-    
-    mp4box.onReady = function(info){
+
+    var mp4boxNEW = function(){
+      mp4box = new MP4Box();
+      mp4box.onMoovStart = function () {
+        log("Starting to receive File Information");
+      }
+      mp4box.onReady = function(info){
       log("onReady info:");
-      log(info);
-      self.initializeSourceBuffersAndSegmentation(info);
+        log(info);
+        self.initializeSourceBuffersAndSegmentation(info);
+      };
+      
+      mp4box.onSegment = function (id, user, buffer, sampleNum) {	//xxxxx
+	      var sb = user;
+	      sb.segmentIndex++;
+	      sb.pendingAppends.push({ id: id, buffer: buffer, sampleNum: sampleNum });
+	      Log.info("Application","Received new segment for track "+id+" up to sample #"+sampleNum+", segments pending append: "+sb.pendingAppends.length);
+	      self.onUpdateEnd.call(sb, true, false);
+      };
     };
-    
-    mp4box.onSegment = function (id, user, buffer, sampleNum) {	//xxxxx
-	    var sb = user;
-	    sb.segmentIndex++;
-	    sb.pendingAppends.push({ id: id, buffer: buffer, sampleNum: sampleNum });
-	    Log.info("Application","Received new segment for track "+id+" up to sample #"+sampleNum+", segments pending append: "+sb.pendingAppends.length);
-	    self.onUpdateEnd.call(sb, true, false);
-    };
 
 
-
-    var downloader = new Downloader();
-    downloader.setInterval(100);
-    downloader.setChunkSize(DOWNLOADER_CHUNK_SIZE);
-    downloader.setUrl(FILE);
-    downloader.start();
+    var downloaderNEW = function(chunk_size){
+      window.downloader = new Downloader();//xxx
+      downloader.setInterval(100);
+      if (!chunk_size)
+        chunk_size = DOWNLOADER_CHUNK_SIZE;
+      downloader.setChunkSize(chunk_size);
+      downloader.setUrl(FILE);
 
 
     
-    downloader.setCallback(
+      downloader.setCallback(
       function (response, end, error) { 
-        log('DL callback()');
+        log('================== DL callback() ========================================================');
         log('DL end: '+end);
         log('DL response #bytes: ' + (response ? response.byteLength : 0));
         // response == ArrayBuffer;  response.usedBytes -v- response.byteLength
-        /*xxxx
-          var s=new DataStream();
-          s.endianness = DataStream.BIG_ENDIAN;
-          mp4box.inputIsoFile.write(s);
-          s.buffer == ArrayBuffer!
-          s.buffer.byteLength == moov header size (50787 B) too for commute.mp4
-          
-          before all flush() change things
-          mp4box.inputStream.buffers[0].usedBytes *seems* to be the header and size of it...
-
-
-
-          s=new DataStream();  s.endianness=DataStream.BIG_ENDIAN;  x=mp4boxHdr.inputIsoFile.moov.write(s);  s.byteLength
-          
-
-          
-          once readySent() (have (just) header):
-          MSE setup
-          range request next chunk to mp4box
-          range request next chunk to mp4box
-          
-          rewrite header (tracey)
-          downloader range request new wanted A/V range of bytes
-          self.initializeSourceBuffersAndSegmentation(info);
-        */
         
 
         var nextStart = 0;
         if (response){
-          if (inMSE)
+          if (inMSE){
+            log('APPENDING REST OF FILE');
+            if (!FKING_FAIL)
+              Log.setLogLevel(Log.debug);
             nextStart = mp4box.appendBuffer(response);
+            Log.setLogLevel(Log.info);
+            log('APPENDED REST OF FILE');
+          }
           else
             nextStart = mp4boxHdr.appendBuffer(response);
         }
      
         if (end){
-          mp4boxHdr.flush();
-          mp4box.flush();
+          if (mp4boxHdr)  mp4boxHdr.flush();
+          if (mp4box)     mp4box.flush();
         }
         else {
           if (!FETCH_ENTIRE_FILE  &&  mp4boxHdr.readySent){
@@ -328,40 +337,84 @@ size2=xxx.bytelength;
             // Set the next chunk we will download to there, and keep going,
             // writing the rest of the mp4 file to the *NEW* mp4box var
             // (which will be writing to MediaSource and thus our <video> tag).
-            origHeaderSize = mp4boxHdr.inputStream.buffers[0].usedBytes;
+            var origHeaderSize = mp4boxHdr.inputStream.buffers[0].usedBytes;
+            log('ORIG HEADER SIZE: ' + origHeaderSize);
+            FETCH_ENTIRE_FILE = true;
+            inMSE = true;
+            
             var skip_from_start = 0;
             if (REWRITE){
               // REWRITE THE HEADER!
-              //self.dumpSTCO(mp4boxHdr);
-              skip_from_start = self.cut();
-              //log(mp4boxHdr.inputStream.buffers[0].usedBytes);
-              //self.dumpSTCO(mp4boxHdr);
-              
-              if (1){ // which technique?!?   suck.  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-                // write new header to a DataStream / buffer (xxx this could prolly be more efficient)
-                var xxx=new DataStream();
-                xxx.endianness = DataStream.BIG_ENDIAN;  
-                mp4boxHdr.inputIsoFile.moov.write(xxx);
-                xxx._buffer.fileStart = 0; //xxx ugh
-                mp4box.appendBuffer(xxx._buffer);
-                // xxx.byteLength  // new header size!
+              ablog(mp4boxHdr.inputStream.buffers[0]);
+              skip_from_start = self.cut(); //xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+              mp4boxHdr.flush();
+              ablog(mp4boxHdr.inputStream.buffers[0]);
+            }
+
+            
+            // now try to take the updated "mp4boxHdr" object (just a header now)
+            // and dump it to a buffer that we *THEN* dump into empty "mp4box" object
+            var arybuf=false;
+            var REALLOC = false;//xxx
+            mp4boxHdr.flush();
+            if (1){ // xxx which technique?!  this one seems to have more complete header/lead so going w/ it..
+              arybuf = mp4boxHdr.writeFile();
+              log("new moov header size: "+arybuf.byteLength);
+
+              if (REALLOC){
+                var usedBytes = ablog(arybuf) - 2;//xxxxxx -2??
+                log('   ******   REALLOC '+DOWNLOADER_CHUNK_SIZE+' MORE BYTES   *******');
+                var xxx=new DataStream(arybuf, 0, DataStream.BIG_ENDIAN);
+                xxx._realloc(DOWNLOADER_CHUNK_SIZE);
+                arybuf = xxx.buffer;
+                arybuf.usedBytes = usedBytes;
               }
-              else {
-                var arybuf = mp4boxHdr.writeFile();
-                log("new moov header size: "+arybuf.byteLength);
-                arybuf.fileStart = 0; //xxx ugh
-                mp4box.appendBuffer(arybuf);
-              }
+            }
+            else if (1){
+              // UGH!  try to write directly into YOUR OWN INPUT BUFFER!
+	            var stream = new DataStream(mp4boxHdr.inputStream.buffers[0], 0, DataStream.BIG_ENDIAN);
+	            mp4boxHdr.inputIsoFile.write(stream);
             }
             else {
-              mp4box.appendBuffer(mp4boxHdr.inputStream.buffers[0]);
+              // write new header to a DataStream / buffer (xxx this could prolly be more efficient)
+              var xxx=new DataStream();
+              xxx.endianness = DataStream.BIG_ENDIAN;
+              mp4boxHdr.inputIsoFile.moov.write(xxx);
+              log("new moov header size: "+xxx.byteLength);
+              arybuf = xxx.buffer;//xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+              //arybuf.usedBytes = xxx.byteLength;//xxx ugh
             }
-            log('ORIG HEADER SIZE: ' + origHeaderSize);
+
+            downloader.stop();
+            delete downloader;
+            downloaderNEW();
+
+            //arybuf.fileStart = arybuf.usedBytes = 50787; //xxx ugh
+            if (arybuf){
+              arybuf.fileStart = 0; //xxx ugh
+              ablog(arybuf);
+            }
+            ablog(mp4boxHdr.inputStream.buffers[0]);
+            if (FKING_FAIL) //xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx FUCKING FAIL
+              arybuf = mp4boxHdr.inputStream.buffers[0];///xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  this works but not the other buffer (!!)
+            
+            mp4boxNEW();
+//debugger;
+log('APPENDING TO NEW mp4box');
+            Log.setLogLevel(Log.debug);
+            mp4box.appendBuffer(arybuf);
+            Log.setLogLevel(Log.info);
+log('APPENDED  TO NEW mp4box');            
+            mp4box.flush();
+            delete mp4boxHdr; mp4boxHdr=null;
+
+            
             nextStart = origHeaderSize + skip_from_start;
             log('NEXT START: ' + nextStart);
+//if (nextStart < 65536) nextStart=65536; //xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+//if (nextStart < 65536) nextStart=50787; //xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
             downloader.setChunkStart(nextStart);
-            FETCH_ENTIRE_FILE = true;
-            inMSE = true;
             downloader.resume();
           }
           else{
@@ -370,15 +423,27 @@ size2=xxx.bytelength;
           }
         }     
         if (error)
-          reset();
+          throw "DOWNLOADER ERROR";
       }
     );//end downloader.setCallback
-  
+    };
+
+    downloaderNEW();
+    downloader.start();
+
 
     
 
     self.cut = function(){
       var mp4 = mp4boxHdr;//xxx
+
+      // compute CURRENT (FULL) moov header size
+      var tmpxxx = mp4.writeFile();
+      var old_moov_size = tmpxxx.byteLength;
+      log("OLD moov size: "+old_moov_size);
+      delete tmpxxx;
+
+      
       window.moov = mp4.inputIsoFile.moov;//xxxx
       window.mdat = mp4.inputIsoFile.mdats[0];//xxxx
       var moov_time_scale = moov.mvhd.timescale;
@@ -419,20 +484,18 @@ size2=xxx.bytelength;
           log('moov_time_scale:'+moov_time_scale);
           log('trak_time_scale:'+trak_time_scale);
           log('stss (list of video keyframes)');
-          log(moov.traks[trak].mdia.minf.stbl.stss.sample_numbers);
           var sample_numbers=moov.traks[trak].mdia.minf.stbl.stss.sample_numbers;
+          console.log(sample_numbers);
           for (var i in sample_numbers){
             // pts:  179*100/2997 ==> 5.972639305972639
             var pts=(sample_numbers[i]-1) * duration / trak_time_scale;//xxx check the -1 math, etc.
+            log('keyframe #'+i+', val='+sample_numbers[i]+', pts='+pts+', vs START='+START);
             if (pts <= START){
               nearestKeyframeTrak = trak;
-              nearestKeyframe = sample_numbers[i];
+              nearestKeyframe = sample_numbers[i] - 1; // xxxxxxxxxxx go from 1-based to 0-based index into other arrays!
             }
-            else{
+            if (pts >= START)
               break;
-            }
-            
-            log('keyframe #: '+i+', val='+sample_numbers[i]+', pts='+pts);
           }
           log('nearestKeyframe: '    + nearestKeyframe); // xxx this is a sample NUMBER (not time)!
         }
@@ -547,7 +610,7 @@ size2=xxx.bytelength;
 
           chunk_start = start;  chunk_end = end; //xxxx  assumes 1 set of chunks AND/OR single moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets -- which prolly *IS* legit -- but axe bunch of useless work above??!?
           
-          for (var i=chunk_start; i < chunk_end; i++){
+          for (var i=chunk_start; i <= chunk_end; i++){
             moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[entries] =
             moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[i]; // xxx need to subtract amount of header we will shrink down by  *PLUS*  the first byte jump distance between orig vs ne A/V packets...
             entries++;
@@ -610,14 +673,15 @@ size2=xxx.bytelength;
       
       log("moov: writing header");
 
-      // compute moov header size
+      // compute NEW moov header size
       var tmpxxx = mp4.writeFile();
-      var moov_size = tmpxxx.byteLength;
-      log("moov size: "+moov_size);
+      var new_moov_size = tmpxxx.byteLength;
+      log("NEW moov size: "+new_moov_size);
       delete tmpxxx;
       
-      // add new moov size
-      offset += moov_size;
+      // add shrink in moov size
+      offset -= (old_moov_size - new_moov_size);
+      offset = 0;//xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
       log("shifting offsets by " + offset);
       
       // moov_shift_offsets_inplace(moov, offset);
@@ -649,6 +713,7 @@ size2=xxx.bytelength;
 
 jQuery(function(){
   // on dom ready...
-  mp4cut = new MP4cut('commute.mp4', 10, 20);
+  //mp4cut = new MP4cut('commute.mp4', 10, 20);
+  mp4cut = new MP4cut('commute.mp4', 0, 3);
   //mp4cut = new MP4cut('commute.mp4');
 });
