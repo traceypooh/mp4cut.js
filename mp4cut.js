@@ -4,7 +4,7 @@
 - read mp4 header
 - determine seek pts
 - rewrite header
-- write 
+- write
 - xhr dump start/end range
 
 
@@ -17,6 +17,9 @@
  grunt;
 
 */
+
+const log = console.log.bind(console) // convenient, no?  Stateless function
+
 
 function ab2str(buf) {
   return String.fromCharCode.apply(null, new Uint16Array(buf));
@@ -46,7 +49,7 @@ function ablog(buffer){
   }
   if(!result)
     console.log('buffer was invalid');
-  
+
   console.log(result);
   return length;
 }
@@ -59,7 +62,7 @@ function ablog(buffer){
       FILE = 'http://ia600301.us.archive.org/~tracey/cors_get.php?path=/27/items/stairs/stairs.mp4';
       FILE = 'http://ia600404.us.archive.org/~tracey/cors_get.php?path=/22/items/commute/commute.mp4';
     }
-    
+
     if (!START)
       START=0;
     if (!END)
@@ -75,21 +78,14 @@ function ablog(buffer){
     var video = false;
     var inMSE = false;
     var self = this;
-    
+
     var mediaSource = new MediaSource();
     if (FILE=='commute.mp4')
       Log.setLogLevel(Log.info);
     else
       Log.setLogLevel(Log.debug);
-    
-    var log=function(){
-      for (arg in arguments)
-        $('#log').append(arguments[arg]+"\n");
-      if (typeof(console)=='undefined')
-        return;
-      console.log(arguments);
-    };
-    log('FILE: '+FILE);
+
+    log('FILE: ', FILE)
 
 
 
@@ -104,7 +100,7 @@ function ablog(buffer){
         duration += stts.sample_counts[i] * stts.sample_deltas[i];
       return duration;
     };
-    
+
 
     self.trak_time_to_moov_time = function(t, moov_time_scale, trak_time_scale){
       return t * moov_time_scale / trak_time_scale;
@@ -122,17 +118,16 @@ function ablog(buffer){
         log(moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets);
       }
     };
-    
+
 
     self.resetMediaSource = function() {
-      video = document.getElementById('vxxx');  
+      video = document.getElementById('vxxx');
 	    mediaSource.video = video;
 	    video.ms = mediaSource;
 	    video.src = window.URL.createObjectURL(mediaSource);
       log("MS RESET");
-      
-      log('mediaSource.readyState:');
-      log(mediaSource.readyState)
+
+      log('mediaSource.readyState:', mediaSource.readyState)
     };
 
 
@@ -146,19 +141,19 @@ function ablog(buffer){
 
 	    for (var i = 0; i < info.tracks.length; i++) {
 		    var track = info.tracks[i];
-        log("addbuffer() now for track "+i);
+        log("addbuffer() now for track ", i);
 		    self.addBuffer(video, track);
 	    }
-  
+
 
       mediaSource.duration = info.duration/info.timescale; //xxx
-      
+
 	    var initSegs = mp4box.initializeSegmentation();
 	    for (var i = 0; i < initSegs.length; i++) {
 		    var sb = initSegs[i].user;
 		    if (i === 0)
 			    sb.ms.pendingInits = 0;
-        
+
 		    sb.addEventListener("updateend", self.onInitAppended);
 		    Log.info("MSE - SourceBuffer #"+sb.id,"Appending initialization data");
 		    sb.appendBuffer(initSegs[i].buffer);
@@ -195,7 +190,7 @@ function ablog(buffer){
     };
 
 
-				
+
 
 
     self.updateBufferedString = function(sb, string) {
@@ -250,8 +245,8 @@ function ablog(buffer){
 
     // xxxxx now move the new MP4Box() stuff above here...
     self.resetMediaSource();  //xxxx
-    video.play();
- 
+  //video.play();
+
     window.mp4boxHdr = new MP4Box();//xxx
     window.mp4box    = null;//xxx
     mp4boxHdr.onMoovStart = function () {
@@ -278,7 +273,7 @@ function ablog(buffer){
         log(info);
         self.initializeSourceBuffersAndSegmentation(info);
       };
-      
+
       mp4box.onSegment = function (id, user, buffer, sampleNum) {	//xxxxx
 	      var sb = user;
 	      sb.segmentIndex++;
@@ -298,14 +293,14 @@ function ablog(buffer){
       downloader.setUrl(FILE);
 
 
-    
+
       downloader.setCallback(
-      function (response, end, error) { 
+      function (response, end, error) {
         log('================== DL callback() ========================================================');
         log('DL end: '+end);
         log('DL response #bytes: ' + (response ? response.byteLength : 0));
         // response == ArrayBuffer;  response.usedBytes -v- response.byteLength
-        
+
 
         var nextStart = 0;
         if (response){
@@ -320,7 +315,7 @@ function ablog(buffer){
           else
             nextStart = mp4boxHdr.appendBuffer(response);
         }
-     
+
         if (end){
           if (mp4boxHdr)  mp4boxHdr.flush();
           if (mp4box)     mp4box.flush();
@@ -328,11 +323,11 @@ function ablog(buffer){
         else {
           if (!FETCH_ENTIRE_FILE  &&  mp4boxHdr.readySent){
             downloader.stop();
-            
+
             // This is where things get real...
             // Write *JUST* the header, into the *NEW* mp4box var.
-            // (The header always seems to nicely appear magically in 
-            //  buffers[0], extending the base buffer size if/as needed, 
+            // (The header always seems to nicely appear magically in
+            //  buffers[0], extending the base buffer size if/as needed,
             //  until the entire header is read.  All of that
             //  sort of makes sense so the entire header can be parsed via
             //  a single buffer, etc.)
@@ -344,7 +339,7 @@ function ablog(buffer){
             log('ORIG HEADER SIZE: ' + origHeaderSize);
             FETCH_ENTIRE_FILE = true;
             inMSE = true;
-            
+
             var skip_from_start = 0;
             if (REWRITE){
               // REWRITE THE HEADER!
@@ -354,7 +349,7 @@ function ablog(buffer){
               ablog(mp4boxHdr.inputStream.buffers[0]);
             }
 
-            
+
             // now try to take the updated "mp4boxHdr" object (just a header now)
             // and dump it to a buffer that we *THEN* dump into empty "mp4box" object
             var arybuf=false;
@@ -400,18 +395,18 @@ function ablog(buffer){
             ablog(mp4boxHdr.inputStream.buffers[0]);
             if (FKING_FAIL) //xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx FUCKING FAIL
               arybuf = mp4boxHdr.inputStream.buffers[0];///xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  this works but not the other buffer (!!)
-            
+
             mp4boxNEW();
 //debugger;
 log('APPENDING TO NEW mp4box');
             Log.setLogLevel(Log.debug);
             mp4box.appendBuffer(arybuf);
             Log.setLogLevel(Log.info);
-log('APPENDED  TO NEW mp4box');            
+log('APPENDED  TO NEW mp4box');
             mp4box.flush();
             delete mp4boxHdr; mp4boxHdr=null;
 
-            
+
             nextStart = origHeaderSize + skip_from_start;
             log('NEXT START: ' + nextStart);
 //if (nextStart < 65536) nextStart=65536; //xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -424,7 +419,7 @@ log('APPENDED  TO NEW mp4box');
             log('DL fetching '+FILE+' bytes starting at: ' + nextStart);
             downloader.setChunkStart(nextStart);
           }
-        }     
+        }
         if (error)
           throw "DOWNLOADER ERROR";
       }
@@ -435,7 +430,7 @@ log('APPENDED  TO NEW mp4box');
     downloader.start();
 
 
-    
+
 
     self.cut = function(){
       var mp4 = mp4boxHdr;//xxx
@@ -446,11 +441,11 @@ log('APPENDED  TO NEW mp4box');
       log("OLD moov size: "+old_moov_size);
       delete tmpxxx;
 
-      
+
       window.moov = mp4.inputIsoFile.moov;//xxxx
       window.mdat = mp4.inputIsoFile.mdats[0];//xxxx
       var moov_time_scale = moov.mvhd.timescale;
-      
+
       var nearestKeyframe=0;
       var nearestKeyframeTrak=-1;
       var starts=[]; // NOTE: these become starting sample *NUMBER* (not time!) for each track
@@ -462,11 +457,11 @@ log('APPENDED  TO NEW mp4box');
         //log(moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets);
         log('stts (time to sample) (always len 1 for IA vids):');
         log(moov.traks[trak].mdia.minf.stbl.stts);
-        
+
         var duration = moov.traks[trak].mdia.minf.stbl.stts.sample_deltas[0]; //xxx may need to expand for non-IA (they have just 1)...
         var duration_time = duration / trak_time_scale; //eg: 100/2997
-        
-        
+
+
         // find the actually wanted start and end, after initing to max range
         starts[trak] = 0;
         ends[trak] = moov.traks[trak].samples.length-1;
@@ -479,9 +474,9 @@ log('APPENDED  TO NEW mp4box');
           else if (pts > END)
             break;
         }
-        
-        
-        
+
+
+
         // now for the video track, adjust ITS start to the nearest keyframe BEFORE OR AT it
         if (moov.traks[trak].mdia.minf.stbl.stss){
           log('moov_time_scale:'+moov_time_scale);
@@ -505,8 +500,8 @@ log('APPENDED  TO NEW mp4box');
       }//end for (var trak in moov.traks)
 
 
-   
-      
+
+
       if (nearestKeyframeTrak >= 0){
         // means we found the best VIDEO KEYFRAME to sync start to above -- we'll use that!
         log('STARTS: ');log(starts);
@@ -514,16 +509,16 @@ log('APPENDED  TO NEW mp4box');
       }
       log('STARTS: ');log(starts);
       log('ENDS: '  );log(ends);
-      
-      
+
+
       if (0 && "xxx"){
         starts=[272,391];
         ends=[521,749];
         log('STARTS: ');log(starts);
         log('ENDS: '  );log(ends);
       }
-   
-   
+
+
 
 
       var moov_duration = 0;
@@ -534,14 +529,14 @@ log('APPENDED  TO NEW mp4box');
       for (var trak in moov.traks){
         var start = starts[trak];
         var end   = ends[trak];
-        
+
         var skip = (moov.traks[trak].samples[start].offset -
                     moov.traks[trak].samples[0].offset);
         if (skip < skip_from_start){
           skip_from_start = skip;
           log('CAN SKIP '+skip+' BYTES! (starting with sample #'+start+' in trak #'+trak+' which is now at byte '+(moov.traks[trak].samples[start].offset)+')');
         }
-        
+
         if ((end+1) < moov.traks[trak].samples.length){
           var end_pos = moov.traks[trak].samples[end].offset;
           if(end_pos > end_offset)
@@ -549,7 +544,7 @@ log('APPENDED  TO NEW mp4box');
           log("New endpos=" + end_pos);
           log("Trak can skip "+(mdat_start + mdat_size - end_offset)+" bytes at end");
         }
-        
+
         // adust STTS
         if (moov.traks[trak].mdia.minf.stbl.stts){
           var samples = moov.traks[trak].samples;
@@ -569,7 +564,7 @@ log('APPENDED  TO NEW mp4box');
               }
               ++sample_count;
             }
-            
+
             sample_counts[entries] = sample_count;
             sample_deltas[entries] = sample_duration;
             entries++;
@@ -584,7 +579,7 @@ log('APPENDED  TO NEW mp4box');
         // adjust STSC (chunkmap) and STCO (chunk offsets)
         if (moov.traks[trak].mdia.minf.stbl.stsc){
           var stsc = moov.traks[trak].mdia.minf.stbl.stsc;
-          
+
           // find the chunk that has the desired start sample in it
           var chunk_start=0;
           if (!stsc.first_chunk.length  &&
@@ -612,7 +607,7 @@ log('APPENDED  TO NEW mp4box');
           self.dumpSTCO(mp4, trak);
 
           chunk_start = start;  chunk_end = end; //xxxx  assumes 1 set of chunks AND/OR single moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets -- which prolly *IS* legit -- but axe bunch of useless work above??!?
-          
+
           for (var i=chunk_start; i <= chunk_end; i++){
             moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[entries] =
             moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[i]; // xxx need to subtract amount of header we will shrink down by  *PLUS*  the first byte jump distance between orig vs ne A/V packets...
@@ -622,7 +617,7 @@ log('APPENDED  TO NEW mp4box');
           moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets = moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets.slice(0,entries);//xxx slice efficient enough?!
           self.dumpSTCO(mp4, trak);
         }
-        
+
 
         // adjust STSS (sync samples)
         if (moov.traks[trak].mdia.minf.stbl.stss){
@@ -649,7 +644,7 @@ log('APPENDED  TO NEW mp4box');
               moov.traks[trak].mdia.minf.stbl.stsz.sample_sizes[entries++] = stsz.sample_sizes[i];
             moov.traks[trak].mdia.minf.stbl.stsz.sample_sizes = moov.traks[trak].mdia.minf.stbl.stsz.sample_sizes.slice(0,entries);//xxx slice efficient enough?!
           }
-        }     
+        }
 
 
         // fixup trak (duration)
@@ -660,7 +655,7 @@ log('APPENDED  TO NEW mp4box');
           moov.traks[trak].mdia.mdhd.duration = trak_duration;
           moov.traks[trak].tkhd.duration = duration;
           log('trak: new duration: ' + duration);
-          
+
           if (duration > moov_duration)
             moov_duration = duration;
         }
@@ -672,8 +667,8 @@ log('APPENDED  TO NEW mp4box');
 
       // subtract bytes we skip at the front of the mdat atom
       var offset = 0 - skip_from_start;
-      log("shifting offsets by " + offset);   
-      
+      log("shifting offsets by " + offset);
+
       log("moov: writing header");
 
       // compute NEW moov header size
@@ -681,12 +676,12 @@ log('APPENDED  TO NEW mp4box');
       var new_moov_size = tmpxxx.byteLength;
       log("NEW moov size: "+new_moov_size);
       delete tmpxxx;
-      
+
       // add shrink in moov size
       offset -= (old_moov_size - new_moov_size);
       offset = 0;//xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
       log("shifting offsets by " + offset);
-      
+
       // moov_shift_offsets_inplace(moov, offset);
       self.dumpSTCO(mp4boxHdr);
       for (var trak in moov.traks){
@@ -694,8 +689,8 @@ log('APPENDED  TO NEW mp4box');
           moov.traks[trak].mdia.minf.stbl.stco.chunk_offsets[i] += offset;
       }//end for (var trak in moov.traks)
       self.dumpSTCO(mp4boxHdr);
-      
-      
+
+
       //create_traffic_shaping(moov, ... //xxx ??!
 
       return skip_from_start;
@@ -706,7 +701,7 @@ log('APPENDED  TO NEW mp4box');
 
 
   // make it so we can do "new MP4cut()" internally (only):
-  MP4cut.prototype.constructor = MP4cut; 
+  MP4cut.prototype.constructor = MP4cut;
   // make it so we can do "new MP4cut(FILE, START, END)" globally:
   window.MP4cut = function(FILE, START, END){ return new MP4cut(FILE, START, END); };
 
@@ -719,7 +714,7 @@ jQuery(function(){
   //mp4cut = new MP4cut('commute.mp4', 10, 20);
   //mp4cut = new MP4cut('commute.mp4');
   if (location.hostname=='localhost')
-    mp4cut = new MP4cut('commute.mp4', 0, 3);
+    mp4cut = new MP4cut('commute.mp4', 10, 20);
   else
     mp4cut = new MP4cut();
 });
