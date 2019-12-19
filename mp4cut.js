@@ -59,8 +59,8 @@ function ablog(buffer){
 
   function MP4cut(FILE, START, END){
     if (!FILE){
-      FILE = 'http://ia600301.us.archive.org/~tracey/cors_get.php?path=/27/items/stairs/stairs.mp4';
-      FILE = 'http://ia600404.us.archive.org/~tracey/cors_get.php?path=/22/items/commute/commute.mp4';
+      FILE = 'https://ia600301.us.archive.org/~tracey/cors_get.php?path=/27/items/stairs/stairs.mp4';
+      FILE = 'https://ia600404.us.archive.org/~tracey/cors_get.php?path=/22/items/commute/commute.mp4';
     }
 
     if (!START)
@@ -716,5 +716,5 @@ jQuery(function(){
   if (location.hostname=='localhost')
     mp4cut = new MP4cut('commute.mp4', 10, 20);
   else
-    mp4cut = new MP4cut();
+    mp4cut = new MP4cut('commute.mp4');
 });
