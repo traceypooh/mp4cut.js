@@ -1,0 +1,57 @@
+{
+  // "used by npm package.json for cmd: yarn test"
+
+  "extends": "airbnb",
+  "parser": "babel-eslint",
+  "plugins": [
+    "compat"
+  ],
+  "env": {
+    "browser": true,
+    "jquery": true
+  },
+  "rules": {
+    // "make sure all used JS compatible with 90%+ of currently used browsers a la caniuse.com"
+    "compat/compat": 2,
+
+    // "omit semicolons in JS"
+    "semi": [2, "never"],
+    "no-unexpected-multiline": 2,
+
+
+    // "allow snakecase var names if dev desires"
+    "camelcase": 0,
+
+    // "allow: x  = 3 (for example lining up multiple lines by column)"
+    "no-multi-spaces": 0,
+
+    // "a single line block / then clause w/o braces is ok"
+    "curly": ["error", "multi-or-nest", "consistent"],
+
+    // "allow ++ or -- at the end fo a for() loop (all other uses are banned per airbnb!)"
+    "no-plusplus": ["error", {"allowForLoopAfterthoughts": true}],
+
+    // "allow JSON/map definitions to column-align values when multiline"
+    "key-spacing": ["error", {"mode": "minimum"}],
+
+    // "allow for (x of array)  and  for (key in obj)  and   for (val in array)"
+    "no-restricted-syntax": ["error", "LabeledStatement", "WithStatement"],
+
+    "no-restricted-globals": ["off", "location"],
+
+    "nonblock-statement-body-position": "off",
+
+    "indent": ["error", 2, {"CallExpression": {"arguments": "first"},
+                            "ArrayExpression": "first",
+                            "FunctionDeclaration": {"parameters": "first"},
+                            "FunctionExpression": {"body": 1, "parameters": 2} }],
+
+    "import/no-extraneous-dependencies": ["error", {
+      "devDependencies": ["**/webpack.*.js"]
+    }],
+
+    // "Turning these off since they throw errors for devDependencies"
+    "import/no-unresolved": ["off"],
+    "import/extensions": ["off"]
+  }
+}
