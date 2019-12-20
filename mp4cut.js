@@ -70,28 +70,26 @@ let END = 10800 // xxx
 
 
 class MP4cut {
-  constructor(FILE, start, end) {
-    if (!FILE) {
-      FILE = 'http://ia600301.us.archive.org/~tracey/cors_get.php?path=/27/items/stairs/stairs.mp4';
-      FILE = 'http://ia600404.us.archive.org/~tracey/cors_get.php?path=/22/items/commute/commute.mp4';
-    }
+  constructor() {
+    // 'http://ia600404.us.archive.org/~tracey/cors_get.php?path=/22/items/commute/commute.mp4'
 
-    if (FILE === 'commute.mp4')
+    const id = cgiarg('id') ? cgiarg('id') : 'commute'
+    const FILE = (location.hostname === 'localhost'
+      ? `${id}.mp4`
+      : `/download/${id}/${id}.mp4?tunnel=1`)
+
+    if (id === 'commute')
       DOWNLOADER_CHUNK_SIZE = 2000000 // ~1.9MB
 
-    const id = cgiarg('id')
-    if (id)
-      FILE = `/download/${id}/${id}.mp4?tunnel=1`
-
-    if (start)
-      START = start
-    if (end)
-      END = end
+    if (cgiarg('start'))
+      START = cgiarg('start')
+    if (cgiarg('end'))
+      END = cgiarg('end')
 
 
     this.mediaSource = new MediaSource()
 
-    if (0  &&  FILE === 'commute.mp4')
+    if (0  &&  id === 'commute')
       Log.setLogLevel(Log.info)
     else
       Log.setLogLevel(Log.debug)
@@ -697,8 +695,4 @@ log('APPENDED  TO NEW mp4box')
 
 
 
-$(() => {
-  // on dom ready...
-  // if (location.hostname === 'localhost')
-  new MP4cut('commute.mp4')//, 60, 70)
-})
+$(() => new MP4cut())
