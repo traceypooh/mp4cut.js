@@ -42,13 +42,13 @@ const ablog = (buffer) => {
   log(buffer)
   log('AB length: ', length)
   const length2 = Math.min(2000, length) // xxx
-  for(let i = 0; i < length2; i+=65535) {
+  for (let i = 0; i < length2; i+=65535) {
     var addition = 65535
-    if(i + 65535 > length2)
+    if (i + 65535 > length2)
       addition = length2 - i
-    result += String.fromCharCode.apply(null, bufView.subarray(i,i+addition))
+    result += String.fromCharCode.apply(null, bufView.subarray(i, i+addition))
   }
-  if(!result)
+  if (!result)
     log('buffer was invalid')
 
   log(result)
@@ -65,8 +65,8 @@ const FKING_FAIL = true // xxx
 let FETCH_ENTIRE_FILE = false
 let video = false
 let inMSE = false
-let START = 0
-let END = 10800 // xxx
+const START = (cgiarg('start') ? cgiarg('start') : 0)
+const END = (cgiarg('start') ? cgiarg('start') : 10800)
 
 
 class MP4cut {
@@ -74,17 +74,12 @@ class MP4cut {
     // 'http://ia600404.us.archive.org/~tracey/cors_get.php?path=/22/items/commute/commute.mp4'
 
     const id = cgiarg('id') ? cgiarg('id') : 'commute'
-    const FILE = (location.hostname === 'localhost'
+    const FILE = (location.hostname === 'localhost'  ||  location.hostname.match(/github/)
       ? `${id}.mp4`
       : `/download/${id}/${id}.mp4?tunnel=1`)
 
     if (id === 'commute')
       DOWNLOADER_CHUNK_SIZE = 2000000 // ~1.9MB
-
-    if (cgiarg('start'))
-      START = cgiarg('start')
-    if (cgiarg('end'))
-      END = cgiarg('end')
 
 
     this.mediaSource = new MediaSource()
@@ -361,18 +356,16 @@ log('APPENDED  TO NEW mp4box')
       try {
         Log.info("MSE - SourceBuffer #"+track_id,"Creation with type '"+mime+"'");
         const sb = this.mediaSource.addSourceBuffer(mime);
-        sb.addEventListener("error", function(e) {
-          Log.error("MSE SourceBuffer #"+track_id,e);
-        });
+        sb.addEventListener('error', (e) => Log.error(`MSE SourceBuffer #${track_id}`, e))
         sb.ms = this.mediaSource
-        sb.id = track_id;
+        sb.id = track_id
         mp4box.setSegmentOptions(track_id, sb, { nbSamples: SEGMENT_NUMBER_SAMPLES, rapAlignement:true } );
-        sb.pendingAppends = [];
+        sb.pendingAppends = []
       } catch (e) {
         Log.error("MSE - SourceBuffer #"+track_id,"Cannot create buffer with type '"+mime+"'" + e);
       }
     } else {
-      Log.warn("MSE", "MIME type '"+mime+"' not supported for creation of a SourceBuffer for track id "+track_id);
+      Log.warn("MSE", "MIME type '"+mime+"' not supported for creation of a SourceBuffer for track id "+track_id)
     }
   }
 

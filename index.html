@@ -13,12 +13,23 @@
   </head>
   <body>
     <h1>mp4cut.js -- JS/clientside based clipping of an .mp4 file - rewrites header and only (losslessly) sends desired A/V packets for the desired start/end range</h1>
+
+    Repo:
+    <a href="https://github.com/traceypooh/mp4cut.js">https://github.com/traceypooh/mp4cut.js</a><br/>
+
     Uses mp4/moov parsing JS from <a href="http://download.tsi.telecom-paristech.fr/gpac/mp4box.js/">mp4box.js</a><br/>
-    <b>Uses the Media Source API</b><br/>
+
+    Uses the Media Source API<br/>
     <a href="https://hacks.mozilla.org/2015/07/streaming-media-on-demand-with-media-source-extensions/">https://hacks.mozilla.org/2015/07/streaming-media-on-demand-with-media-source-extensions/</a><br/>
     to inject video to this tag:<br/>
+
     <video id="vxxx" controls autoplay width="320" height="240"></video><br/>
-    <b style="color:red">(media files need to be served using something like <code>ruby -run -e httpd . -p 8000</code> for http RANGE requests, and the server need to support CORS options)</b><br/>
+
+    <p style="color:red">
+      (media files served locally need to be served using something like
+      <code>ruby -run -e httpd . -p 8000</code>
+      for http RANGE requests, and the server need to support CORS options)
+    </p>
 
     <hr/>
     <div id="log" style="font-family:monospace; white-space:pre"><b>LOG:</b><br/></div>
