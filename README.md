@@ -14,4 +14,4 @@ Here's the gist of the idea and what this does.  For a given mp4 video, instead 
 
 
 ### See the demonstration page:
-- http://traceypooh.github.io/mp4cut.js/
+- https://traceypooh.github.io/mp4cut.js/

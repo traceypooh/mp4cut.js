@@ -1,5 +1,6 @@
 /*
-xxx get working in safari; check: firefox, iphone
+xxx check: iphone
+xxx (known) !commute not workin on https://traceypooh.github.io/mp4cut.js/  (tries to serve V locally)
 
 - read mp4 header
 - determine seek pts
