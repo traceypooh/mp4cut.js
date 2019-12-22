@@ -80,7 +80,7 @@ class MP4cut {
     // 'http://ia600404.us.archive.org/~tracey/cors_get.php?path=/22/items/commute/commute.mp4'
 
     const ID = (cgiarg('id') ? cgiarg('id') : 'commute')
-    const FILE = (location.hostname === 'localhost'  ||  location.hostname.match(/github/)
+    this.FILE = (location.hostname === 'localhost'  ||  location.hostname.match(/github/)
       ? `${ID}.mp4`
       : `/download/${ID}/${ID}.mp4?tunnel=1`)
 
@@ -96,7 +96,7 @@ class MP4cut {
     else
       Log.setLogLevel(Log.debug)
 
-    log('FILE: ', FILE)
+    log('FILE: ', this.FILE)
 
 
     this.resetMediaSource()  // xxxx
@@ -110,171 +110,172 @@ class MP4cut {
     this.mp4boxHdr.onReady = (info) => log('HDR onReady info', info)
 
 
-    const mp4boxNEW = () => {
-      this.mp4box = new MP4Box()
-      this.mp4box.onMoovStart = () => {
-        log('Starting to receive File Information')
+    const downloadernew = this.downloaderNEW()
+    downloadernew.start()
+  }
+
+
+  downloaderNEW() {
+    const chunk_size = DOWNLOADER_CHUNK_SIZE
+    let downloader = new Downloader()
+    downloader.setInterval(100)
+    downloader.setChunkSize(chunk_size)
+    downloader.setUrl(this.FILE)
+
+
+    downloader.setCallback((response, end, error) => {
+      log('================== DL callback() ========================================================')
+      log('DL end: ', end)
+      log('DL response #bytes: ', (response ? response.byteLength : 0))
+      // response == ArrayBuffer;  response.usedBytes -v- response.byteLength
+
+
+      let nextStart = 0
+      if (response) {
+        if (inMSE) {
+          log('APPENDING REST OF FILE')
+          if (!FKING_FAIL)
+            Log.setLogLevel(Log.debug)
+          nextStart = this.mp4box.appendBuffer(response)
+          Log.setLogLevel(Log.info)
+          log('APPENDED REST OF FILE')
+        } else {
+          nextStart = this.mp4boxHdr.appendBuffer(response)
+        }
       }
 
-      this.mp4box.onReady = (info) => {
-        log('onReady info', info)
-        this.initializeSourceBuffersAndSegmentation(info)
+      if (end) {
+        if (this.mp4boxHdr)  this.mp4boxHdr.flush()
+        if (this.mp4box)     this.mp4box.flush()
+      } else if (!FETCH_ENTIRE_FILE  &&  this.mp4boxHdr.readySent) {
+        downloader.stop()
+
+        // This is where things get real...
+        // Write *JUST* the header, into the *NEW* mp4box var.
+        // (The header always seems to nicely appear magically in
+        //  buffers[0], extending the base buffer size if/as needed,
+        //  until the entire header is read.  All of that
+        //  sort of makes sense so the entire header can be parsed via
+        //  a single buffer, etc.)
+        // "Rewind" the downloader parser to *just* after the header.
+        // Set the next chunk we will download to there, and keep going,
+        // writing the rest of the mp4 file to the *NEW* mp4box var
+        // (which will be writing to MediaSource and thus our <video> tag).
+        const origHeaderSize = this.mp4boxHdr.inputStream.buffers[0].usedBytes
+        log('ORIG HEADER SIZE: ', origHeaderSize)
+        FETCH_ENTIRE_FILE = true
+        inMSE = true
+
+        let skip_from_start = 0
+        if (REWRITE) {
+          // REWRITE THE HEADER!
+          ablog(this.mp4boxHdr.inputStream.buffers[0])
+          skip_from_start = this.cut() // xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+          this.mp4boxHdr.flush()
+          ablog(this.mp4boxHdr.inputStream.buffers[0])
+        }
+
+
+        // now try to take the updated "this.mp4boxHdr" object (just a header now)
+        // and dump it to a buffer that we *THEN* dump into empty "this.mp4box" object
+        let arybuf = false
+        const REALLOC = false // xxx
+        this.mp4boxHdr.flush()
+        const technique = 0
+        if (technique === 0) { // xxx which technique?!  this one seems to have more complete header/lead so going w/ it..
+          arybuf = this.mp4boxHdr.writeFile()
+          log('new moov header size: ', arybuf.byteLength)
+
+          if (REALLOC) {
+            const usedBytes = ablog(arybuf) - 2 // xxxxxx -2??
+            log('   ******   REALLOC ', DOWNLOADER_CHUNK_SIZE, ' MORE BYTES   *******')
+            const xxx = new DataStream(arybuf, 0, DataStream.BIG_ENDIAN)
+            // eslint-disable-next-line  no-underscore-dangle
+            xxx._realloc(DOWNLOADER_CHUNK_SIZE)
+            arybuf = xxx.buffer
+            arybuf.usedBytes = usedBytes
+          }
+        } else if (technique === 1) {
+          // UGH!  try to write directly into YOUR OWN INPUT BUFFER!
+          const stream = new DataStream(this.mp4boxHdr.inputStream.buffers[0], 0, DataStream.BIG_ENDIAN)
+          this.mp4boxHdr.inputIsoFile.write(stream)
+        } else {
+          // write new header to a DataStream / buffer (xxx this could prolly be more efficient)
+          const xxxx = new DataStream()
+          xxxx.endianness = DataStream.BIG_ENDIAN
+          this.mp4boxHdr.inputIsoFile.moov.write(xxxx)
+          log('new moov header size: ', xxxx.byteLength)
+          arybuf = xxxx.buffer // xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+          // arybuf.usedBytes = xxx.byteLength // xxx ugh
+        }
+
+        downloader.stop()
+        downloader = null // xxx delete
+        downloader = this.downloaderNEW() // xxx2020 ugh, omg...
+
+        // arybuf.fileStart = arybuf.usedBytes = 50787 // xxx ugh
+        if (arybuf) {
+          arybuf.fileStart = 0 // xxx ugh
+          ablog(arybuf)
+        }
+        ablog(this.mp4boxHdr.inputStream.buffers[0])
+        if (FKING_FAIL) // xxxxxxxxxxxxxxxxxxxx FUCKING FAIL
+          [arybuf] = this.mp4boxHdr.inputStream.buffers // xxxxxxx this works but not other buffer (!!)
+
+        this.mp4boxNEW()
+        // debugger
+        log('APPENDING TO NEW mp4box')
+        Log.setLogLevel(Log.debug)
+        this.mp4box.appendBuffer(arybuf)
+        Log.setLogLevel(Log.info)
+        log('APPENDED  TO NEW mp4box')
+        this.mp4box.flush()
+
+        delete this.mp4boxHdr
+        this.mp4boxHdr = null
+
+
+        nextStart = origHeaderSize + skip_from_start
+        log('NEXT START:', nextStart)
+        // if (nextStart < 65536) nextStart=65536 // xxxxxxxxxxxxxxxxxxxx
+        // if (nextStart < 65536) nextStart=50787 // xxxxxxxxxxxxxxxxxxxx
+
+        downloader.setChunkStart(nextStart)
+        downloader.resume()
+      } else {
+        log('DL fetching', this.FILE, 'bytes starting at:', nextStart)
+        downloader.setChunkStart(nextStart)
       }
 
-      this.mp4box.onSegment = (id, user, buffer, sampleNum) => { // xxxxx
-        const sb = user
-        sb.segmentIndex += 1
-        sb.pendingAppends.push({ id, buffer, sampleNum })
-        Log.info(`Received new segment for track ${id}
-          up to sample #${sampleNum},
-          segments pending append: ${sb.pendingAppends.length}`)
-        this.on_update_end(sb, true, false)
-      }
+      if (error)
+        throw new Error('DOWNLOADER ERROR')
+    }) // end downloader.setCallback()
+
+    return downloader
+  } // end downloaderNEW()
+
+
+  mp4boxNEW() {
+    this.mp4box = new MP4Box()
+    this.mp4box.onMoovStart = () => {
+      log('Starting to receive File Information')
     }
 
+    this.mp4box.onReady = (info) => {
+      log('onReady info', info)
+      this.initializeSourceBuffersAndSegmentation(info)
+    }
 
-    const downloaderNEW = () => {
-      const chunk_size = DOWNLOADER_CHUNK_SIZE
-      let downloader = new Downloader()
-      downloader.setInterval(100)
-      downloader.setChunkSize(chunk_size)
-      downloader.setUrl(FILE)
-
-
-      downloader.setCallback((response, end, error) => {
-        log('================== DL callback() ========================================================')
-        log('DL end: ', end)
-        log('DL response #bytes: ', (response ? response.byteLength : 0))
-        // response == ArrayBuffer;  response.usedBytes -v- response.byteLength
-
-
-        let nextStart = 0
-        if (response) {
-          if (inMSE) {
-            log('APPENDING REST OF FILE')
-            if (!FKING_FAIL)
-              Log.setLogLevel(Log.debug)
-            nextStart = this.mp4box.appendBuffer(response)
-            Log.setLogLevel(Log.info)
-            log('APPENDED REST OF FILE')
-          } else {
-            nextStart = this.mp4boxHdr.appendBuffer(response)
-          }
-        }
-
-        if (end) {
-          if (this.mp4boxHdr)  this.mp4boxHdr.flush()
-          if (this.mp4box)     this.mp4box.flush()
-        } else if (!FETCH_ENTIRE_FILE  &&  this.mp4boxHdr.readySent) {
-          downloader.stop()
-
-          // This is where things get real...
-          // Write *JUST* the header, into the *NEW* mp4box var.
-          // (The header always seems to nicely appear magically in
-          //  buffers[0], extending the base buffer size if/as needed,
-          //  until the entire header is read.  All of that
-          //  sort of makes sense so the entire header can be parsed via
-          //  a single buffer, etc.)
-          // "Rewind" the downloader parser to *just* after the header.
-          // Set the next chunk we will download to there, and keep going,
-          // writing the rest of the mp4 file to the *NEW* mp4box var
-          // (which will be writing to MediaSource and thus our <video> tag).
-          const origHeaderSize = this.mp4boxHdr.inputStream.buffers[0].usedBytes
-          log('ORIG HEADER SIZE: ', origHeaderSize)
-          FETCH_ENTIRE_FILE = true
-          inMSE = true
-
-          let skip_from_start = 0
-          if (REWRITE) {
-            // REWRITE THE HEADER!
-            ablog(this.mp4boxHdr.inputStream.buffers[0])
-            skip_from_start = this.cut() // xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-            this.mp4boxHdr.flush()
-            ablog(this.mp4boxHdr.inputStream.buffers[0])
-          }
-
-
-          // now try to take the updated "this.mp4boxHdr" object (just a header now)
-          // and dump it to a buffer that we *THEN* dump into empty "this.mp4box" object
-          let arybuf = false
-          const REALLOC = false // xxx
-          this.mp4boxHdr.flush()
-          const technique = 0
-          if (technique === 0) { // xxx which technique?!  this one seems to have more complete header/lead so going w/ it..
-            arybuf = this.mp4boxHdr.writeFile()
-            log('new moov header size: ', arybuf.byteLength)
-
-            if (REALLOC) {
-              const usedBytes = ablog(arybuf) - 2 // xxxxxx -2??
-              log('   ******   REALLOC ', DOWNLOADER_CHUNK_SIZE, ' MORE BYTES   *******')
-              const xxx = new DataStream(arybuf, 0, DataStream.BIG_ENDIAN)
-              // eslint-disable-next-line  no-underscore-dangle
-              xxx._realloc(DOWNLOADER_CHUNK_SIZE)
-              arybuf = xxx.buffer
-              arybuf.usedBytes = usedBytes
-            }
-          } else if (technique === 1) {
-            // UGH!  try to write directly into YOUR OWN INPUT BUFFER!
-            const stream = new DataStream(this.mp4boxHdr.inputStream.buffers[0], 0, DataStream.BIG_ENDIAN)
-            this.mp4boxHdr.inputIsoFile.write(stream)
-          } else {
-            // write new header to a DataStream / buffer (xxx this could prolly be more efficient)
-            const xxxx = new DataStream()
-            xxxx.endianness = DataStream.BIG_ENDIAN
-            this.mp4boxHdr.inputIsoFile.moov.write(xxxx)
-            log('new moov header size: ', xxxx.byteLength)
-            arybuf = xxxx.buffer // xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-            // arybuf.usedBytes = xxx.byteLength // xxx ugh
-          }
-
-          downloader.stop()
-          downloader = null // xxx delete
-          downloader = downloaderNEW() // xxx2020 ugh, omg...
-
-          // arybuf.fileStart = arybuf.usedBytes = 50787 // xxx ugh
-          if (arybuf) {
-            arybuf.fileStart = 0 // xxx ugh
-            ablog(arybuf)
-          }
-          ablog(this.mp4boxHdr.inputStream.buffers[0])
-          if (FKING_FAIL) // xxxxxxxxxxxxxxxxxxxx FUCKING FAIL
-            [arybuf] = this.mp4boxHdr.inputStream.buffers // xxxxxxx this works but not other buffer (!!)
-
-          mp4boxNEW() // NOTE: replaces this.mp4box
-          // debugger
-          log('APPENDING TO NEW mp4box')
-          Log.setLogLevel(Log.debug)
-          this.mp4box.appendBuffer(arybuf)
-          Log.setLogLevel(Log.info)
-          log('APPENDED  TO NEW mp4box')
-          this.mp4box.flush()
-
-          delete this.mp4boxHdr
-          this.mp4boxHdr = null
-
-
-          nextStart = origHeaderSize + skip_from_start
-          log('NEXT START:', nextStart)
-          // if (nextStart < 65536) nextStart=65536 // xxxxxxxxxxxxxxxxxxxx
-          // if (nextStart < 65536) nextStart=50787 // xxxxxxxxxxxxxxxxxxxx
-
-          downloader.setChunkStart(nextStart)
-          downloader.resume()
-        } else {
-          log('DL fetching', FILE, 'bytes starting at:', nextStart)
-          downloader.setChunkStart(nextStart)
-        }
-
-        if (error)
-          throw new Error('DOWNLOADER ERROR')
-      }) // end downloader.setCallback()
-
-      return downloader
-    } // end downloaderNEW()
-
-    const downloadernew = downloaderNEW()
-    downloadernew.start()
-  } // end constructor()
+    this.mp4box.onSegment = (id, user, buffer, sampleNum) => { // xxxxx
+      const sb = user
+      sb.segmentIndex += 1
+      sb.pendingAppends.push({ id, buffer, sampleNum })
+      Log.info(`Received new segment for track ${id}
+        up to sample #${sampleNum},
+        segments pending append: ${sb.pendingAppends.length}`)
+      this.on_update_end(sb, true, false)
+    }
+  }
 
 
   static stts_get_duration(stts) {
