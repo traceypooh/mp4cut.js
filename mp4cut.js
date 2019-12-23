@@ -77,12 +77,7 @@ const END = (cgiarg('end') ? cgiarg('end') : 10800)
 
 class MP4cut {
   constructor() {
-    // 'http://ia600404.us.archive.org/~tracey/cors_get.php?path=/22/items/commute/commute.mp4'
-
     const ID = (cgiarg('id') ? cgiarg('id') : 'commute')
-    this.FILE = (location.hostname === 'localhost'  ||  location.hostname.match(/github/)
-      ? `${ID}.mp4`
-      : `/download/${ID}/${ID}.mp4?tunnel=1`)
 
     if (ID === 'commute')
       DOWNLOADER_CHUNK_SIZE = 2000000 // ~1.9MB
@@ -91,10 +86,7 @@ class MP4cut {
     // eslint-disable-next-line  compat/compat
     this.mediaSource = new MediaSource()
 
-    if (0  &&  ID === 'commute')
-      Log.setLogLevel(Log.info)
-    else
-      Log.setLogLevel(Log.debug)
+    Log.setLogLevel(ID === 'commute-xxx' ? Log.info : Log.debug)
 
     log('FILE: ', this.FILE)
 
@@ -110,16 +102,26 @@ class MP4cut {
     this.mp4boxHdr.onReady = (info) => log('HDR onReady info', info)
 
 
-    const downloadernew = this.downloaderNEW()
-    downloadernew.start()
+    if (location.hostname !== 'www-tracey.archive.org'  &&  location.hostname !== 'archive.org') {
+      $.getJSON(`https://archive.org/metadata/${ID}`, (r) => {
+        this.FILE = `https://${r.server}/cors_get.php?path=${r.dir}/${ID}.mp4`
+        this.FILE = `https://${r.server}${r.dir}/${ID}.mp4`
+
+        const downloadernew = this.downloaderNEW()
+        downloadernew.start()
+      })
+    } else {
+      this.FILE = `/download/${ID}/${ID}.mp4?tunnel=1`
+      const downloadernew = this.downloaderNEW()
+      downloadernew.start()
+    }
   }
 
 
   downloaderNEW() {
-    const chunk_size = DOWNLOADER_CHUNK_SIZE
     let downloader = new Downloader()
     downloader.setInterval(100)
-    downloader.setChunkSize(chunk_size)
+    downloader.setChunkSize(DOWNLOADER_CHUNK_SIZE)
     downloader.setUrl(this.FILE)
 
 
@@ -313,8 +315,8 @@ class MP4cut {
     vid.ms = this.mediaSource
     // eslint-disable-next-line  compat/compat
     vid.src = URL.createObjectURL(this.mediaSource)
-    log('MS RESET')
 
+    log('MS RESET')
     log('mediaSource.readyState:', this.mediaSource.readyState)
   }
 
