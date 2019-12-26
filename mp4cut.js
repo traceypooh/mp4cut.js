@@ -1,6 +1,7 @@
 /*
 xxx check: iphone
 xxx (known) !commute not workin on https://traceypooh.github.io/mp4cut.js/  (tries to serve V locally)
+xxx make mp4play.js type setup that will just play any IA vid (like now!) *OR* any w/ start/end...
 
 - read mp4 header
 - determine seek pts
@@ -71,13 +72,13 @@ const FKING_FAIL = true // xxx
 let FETCH_ENTIRE_FILE = false
 const video = false
 let inMSE = false
-const START = (cgiarg('start') ? cgiarg('start') : 0)
-const END = (cgiarg('end') ? cgiarg('end') : 10800)
 
 
 class MP4cut {
   constructor() {
     const ID = (cgiarg('id') ? cgiarg('id') : 'commute')
+    this.start = (cgiarg('start') ? cgiarg('start') : 0)
+    this.end = (cgiarg('end') ? cgiarg('end') : 10800)
 
     if (ID === 'commute')
       DOWNLOADER_CHUNK_SIZE = 2000000 // ~1.9MB
@@ -87,9 +88,6 @@ class MP4cut {
     this.mediaSource = new MediaSource()
 
     Log.setLogLevel(ID === 'commute-xxx' ? Log.info : Log.debug)
-
-    log('FILE: ', this.FILE)
-
 
     this.resetMediaSource()  // xxxx
     // video.play() // xxx need to wait for user event now these days
@@ -123,6 +121,7 @@ class MP4cut {
     downloader.setInterval(100)
     downloader.setChunkSize(DOWNLOADER_CHUNK_SIZE)
     downloader.setUrl(this.FILE)
+    log('FILE: ', this.FILE)
 
 
     downloader.setCallback((response, end, error) => {
@@ -480,11 +479,11 @@ class MP4cut {
       ends[trak] = moov.traks[trak].samples.length - 1
       for (let i = 0; i < moov.traks[trak].samples.length; i++) {
         const pts = (i * duration) / trak_time_scale
-        if (pts <= START)
+        if (pts <= this.start)
           starts[trak] = i
-        if (pts <= END)
+        if (pts <= this.end)
           ends[trak] = i
-        else if (pts > END)
+        else if (pts > this.end)
           break
       }
 
@@ -501,12 +500,12 @@ class MP4cut {
         for (const i in sample_numbers) {
           // pts:  179*100/2997 ==> 5.972639305972639
           const pts = ((sample_numbers[i] - 1) * duration) / trak_time_scale // xxx check the -1 math, etc.
-          log('keyframe #', i, 'val=', sample_numbers[i], 'pts=', pts, ', vs START=', START)
-          if (pts <= START) {
+          log('keyframe #', i, 'val=', sample_numbers[i], 'pts=', pts, ', vs START=', this.start)
+          if (pts <= this.start) {
             nearestKeyframeTrak = trak
             nearestKeyframe = sample_numbers[i] - 1 // xxxxxxxxxxx go from 1-based to 0-based index into other arrays!
           }
-          if (pts >= START)
+          if (pts >= this.start)
             break
         }
         log('nearestKeyframe: ', nearestKeyframe) // xxx this is a sample NUMBER (not time)!
