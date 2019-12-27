@@ -69,9 +69,7 @@ const autoplay = true
 const REWRITE = false // xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 const FKING_FAIL = true // xxx
 
-let FETCH_ENTIRE_FILE = false
 const video = false
-let inMSE = false
 
 
 class MP4cut {
@@ -100,18 +98,21 @@ class MP4cut {
     this.mp4boxHdr.onReady = (info) => log('HDR onReady info', info)
 
 
-    if (location.hostname !== 'www-tracey.archive.org'  &&  location.hostname !== 'archive.org') {
+    if (location.hostname === 'www-tracey.archive.org'
+        ||  location.hostname === 'archive.org') {
+      this.FILE = `/download/${ID}/${ID}.mp4?tunnel=1`
+      const downloadernew = this.downloaderNEW()
+      downloadernew.start()
+    } else if (ID === 'commute') {
+      this.FILE = 'commute.mp4' // local-to-repo demo file
+    } else {
       $.getJSON(`https://archive.org/metadata/${ID}`, (r) => {
         this.FILE = `https://${r.server}/cors_get.php?path=${r.dir}/${ID}.mp4`
-        this.FILE = `https://${r.server}${r.dir}/${ID}.mp4`
+        this.FILE = `https://${r.server}${r.dir}/${ID}.mp4` // xxx
 
         const downloadernew = this.downloaderNEW()
         downloadernew.start()
       })
-    } else {
-      this.FILE = `/download/${ID}/${ID}.mp4?tunnel=1`
-      const downloadernew = this.downloaderNEW()
-      downloadernew.start()
     }
   }
 
@@ -133,7 +134,7 @@ class MP4cut {
 
       let nextStart = 0
       if (response) {
-        if (inMSE) {
+        if (this.inMSE) {
           log('APPENDING REST OF FILE')
           if (!FKING_FAIL)
             Log.setLogLevel(Log.debug)
@@ -148,7 +149,7 @@ class MP4cut {
       if (end) {
         if (this.mp4boxHdr)  this.mp4boxHdr.flush()
         if (this.mp4box)     this.mp4box.flush()
-      } else if (!FETCH_ENTIRE_FILE  &&  this.mp4boxHdr.readySent) {
+      } else if (!this.FETCH_ENTIRE_FILE  &&  this.mp4boxHdr.readySent) {
         downloader.stop()
 
         // This is where things get real...
@@ -164,8 +165,8 @@ class MP4cut {
         // (which will be writing to MediaSource and thus our <video> tag).
         const origHeaderSize = this.mp4boxHdr.inputStream.buffers[0].usedBytes
         log('ORIG HEADER SIZE: ', origHeaderSize)
-        FETCH_ENTIRE_FILE = true
-        inMSE = true
+        this.FETCH_ENTIRE_FILE = true
+        this.inMSE = true
 
         let skip_from_start = 0
         if (REWRITE) {
