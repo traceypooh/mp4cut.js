@@ -101,17 +101,15 @@ class MP4cut {
     if (location.hostname === 'www-tracey.archive.org'
         ||  location.hostname === 'archive.org') {
       this.FILE = `/download/${ID}/${ID}.mp4?tunnel=1`
-      const downloadernew = this.downloaderNEW()
-      downloadernew.start()
+      this.downloaderNEW().start()
     } else if (ID === 'commute') {
       this.FILE = 'commute.mp4' // local-to-repo demo file
+      this.downloaderNEW().start()
     } else {
       $.getJSON(`https://archive.org/metadata/${ID}`, (r) => {
         this.FILE = `https://${r.server}/cors_get.php?path=${r.dir}/${ID}.mp4`
         this.FILE = `https://${r.server}${r.dir}/${ID}.mp4` // xxx
-
-        const downloadernew = this.downloaderNEW()
-        downloadernew.start()
+        this.downloaderNEW().start()
       })
     }
   }
