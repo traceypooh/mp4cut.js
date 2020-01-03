@@ -2,6 +2,7 @@
 xxx check: iphone
 xxx (known) !commute not workin on https://traceypooh.github.io/mp4cut.js/  (tries to serve V locally)
 xxx make mp4play.js type setup that will just play any IA vid (like now!) *OR* any w/ start/end...
+xxx loading locally doesn't work anymore since updating to latest mp4box.js usage :(
 
 - read mp4 header
 - determine seek pts
@@ -14,7 +15,7 @@ xxx make mp4play.js type setup that will just play any IA vid (like now!) *OR* a
  git clone git@github.com:gpac/mp4box.js
  cd mp4box.js
  yarn
- grunt
+ ./node_modules/.bin/grunt
 
 
  @see mp4box.js/test/index.js  for a lot of the code basis for downloader and segmenting portions
