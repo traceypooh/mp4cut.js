@@ -16,11 +16,13 @@ xxx make mp4play.js type setup that will just play any IA vid (like now!) *OR* a
  yarn
  grunt
 
+
+ @see mp4box.js/test/index.js  for a lot of the code basis for downloader and segmenting portions
 */
 
 import cgiarg from './cgiarg.js'
 
-/* global MP4Box Downloader DataStream Log */
+/* global MP4Box Downloader Log */
 
 /* eslint-disable  max-len */
 
@@ -67,9 +69,6 @@ const SEGMENT_NUMBER_SAMPLES = 1000
 let DOWNLOADER_CHUNK_SIZE = 200000 // ~200KB
 const autoplay = true
 const REWRITE = false // xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-const FKING_FAIL = true // xxx
-
-const video = false
 
 
 class MP4cut {
@@ -87,12 +86,12 @@ class MP4cut {
 
     Log.setLogLevel(ID === 'commute-xxx' ? Log.info : Log.debug)
 
-    this.resetMediaSource()  // xxxx
+    this.reset_media_source()  // xxxx
     // video.play() // xxx need to wait for user event now these days
 
     this.mp4box = null
 
-    this.mp4boxHdr = new MP4Box()
+    this.mp4boxHdr = MP4Box.createFile()
     this.mp4boxHdr.onMoovStart = () => log('HDR starting to receive File info')
     this.mp4boxHdr.onError = (e) => log('HDR error', e)
     this.mp4boxHdr.onReady = (info) => log('HDR onReady info', info)
@@ -134,8 +133,6 @@ class MP4cut {
       if (response) {
         if (this.inMSE) {
           log('APPENDING REST OF FILE')
-          if (!FKING_FAIL)
-            Log.setLogLevel(Log.debug)
           nextStart = this.mp4box.appendBuffer(response)
           Log.setLogLevel(Log.info)
           log('APPENDED REST OF FILE')
@@ -161,7 +158,7 @@ class MP4cut {
         // Set the next chunk we will download to there, and keep going,
         // writing the rest of the mp4 file to the *NEW* mp4box var
         // (which will be writing to MediaSource and thus our <video> tag).
-        const origHeaderSize = this.mp4boxHdr.inputStream.buffers[0].usedBytes
+        const origHeaderSize = this.mp4boxHdr.stream.buffers[0].usedBytes
         log('ORIG HEADER SIZE: ', origHeaderSize)
         this.FETCH_ENTIRE_FILE = true
         this.inMSE = true
@@ -169,64 +166,33 @@ class MP4cut {
         let skip_from_start = 0
         if (REWRITE) {
           // REWRITE THE HEADER!
-          ablog(this.mp4boxHdr.inputStream.buffers[0])
+          ablog(this.mp4boxHdr.stream.buffers[0])
           skip_from_start = this.cut() // xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
           this.mp4boxHdr.flush()
-          ablog(this.mp4boxHdr.inputStream.buffers[0])
+          ablog(this.mp4boxHdr.stream.buffers[0])
         }
 
 
         // now try to take the updated "this.mp4boxHdr" object (just a header now)
         // and dump it to a buffer that we *THEN* dump into empty "this.mp4box" object
-        let arybuf = false
-        const REALLOC = false // xxx
         this.mp4boxHdr.flush()
-        const technique = 0
-        if (technique === 0) { // xxx which technique?!  this one seems to have more complete header/lead so going w/ it..
-          arybuf = this.mp4boxHdr.writeFile()
-          log('new moov header size: ', arybuf.byteLength)
-
-          if (REALLOC) {
-            const usedBytes = ablog(arybuf) - 2 // xxxxxx -2??
-            log('   ******   REALLOC ', DOWNLOADER_CHUNK_SIZE, ' MORE BYTES   *******')
-            const xxx = new DataStream(arybuf, 0, DataStream.BIG_ENDIAN)
-            // eslint-disable-next-line  no-underscore-dangle
-            xxx._realloc(DOWNLOADER_CHUNK_SIZE)
-            arybuf = xxx.buffer
-            arybuf.usedBytes = usedBytes
-          }
-        } else if (technique === 1) {
-          // UGH!  try to write directly into YOUR OWN INPUT BUFFER!
-          const stream = new DataStream(this.mp4boxHdr.inputStream.buffers[0], 0, DataStream.BIG_ENDIAN)
-          this.mp4boxHdr.inputIsoFile.write(stream)
-        } else {
-          // write new header to a DataStream / buffer (xxx this could prolly be more efficient)
-          const xxxx = new DataStream()
-          xxxx.endianness = DataStream.BIG_ENDIAN
-          this.mp4boxHdr.inputIsoFile.moov.write(xxxx)
-          log('new moov header size: ', xxxx.byteLength)
-          arybuf = xxxx.buffer // xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-          // arybuf.usedBytes = xxx.byteLength // xxx ugh
-        }
 
         downloader.stop()
         downloader = null // xxx delete
         downloader = this.downloaderNEW() // xxx2020 ugh, omg...
 
         // arybuf.fileStart = arybuf.usedBytes = 50787 // xxx ugh
-        if (arybuf) {
-          arybuf.fileStart = 0 // xxx ugh
-          ablog(arybuf)
-        }
-        ablog(this.mp4boxHdr.inputStream.buffers[0])
-        if (FKING_FAIL) // xxxxxxxxxxxxxxxxxxxx FUCKING FAIL
-          [arybuf] = this.mp4boxHdr.inputStream.buffers // xxxxxxx this works but not other buffer (!!)
+
+        const [arybuf] = this.mp4boxHdr.stream.buffers
+        log('new moov header size: ', arybuf.byteLength)
+        ablog(arybuf)
 
         this.mp4boxNEW()
         // debugger
         log('APPENDING TO NEW mp4box')
         Log.setLogLevel(Log.debug)
-        this.mp4box.appendBuffer(arybuf)
+        const ret = this.mp4box.appendBuffer(arybuf)
+        log('appendBuffer() returned', ret)
         Log.setLogLevel(Log.info)
         log('APPENDED  TO NEW mp4box')
         this.mp4box.flush()
@@ -256,7 +222,7 @@ class MP4cut {
 
 
   mp4boxNEW() {
-    this.mp4box = new MP4Box()
+    this.mp4box = MP4Box.createFile()
     this.mp4box.onMoovStart = () => {
       log('Starting to receive File Information')
     }
@@ -307,7 +273,7 @@ class MP4cut {
   }
 
 
-  resetMediaSource() {
+  reset_media_source() {
     const vid = document.getElementById('vxxx')
     this.mediaSource.video = vid
     vid.ms = this.mediaSource
@@ -338,11 +304,11 @@ class MP4cut {
 
     const initSegs = this.mp4box.initializeSegmentation()
     for (let i = 0; i < initSegs.length; i++) {
-      const sb = initSegs[i].user
+      const sb = initSegs[i].user // NOTE: we passed this in - search for `setSegmentOptions()`
       if (i === 0)
         sb.ms.pendingInits = 0
 
-      sb.addEventListener('updateend', (e) => this.onInitAppended(e))
+      sb.addEventListener('updateend', (e) => this.on_init_appended(e))
       Log.info(`MSE - SourceBuffer #${sb.id}`, 'Appending initialization data')
       sb.appendBuffer(initSegs[i].buffer)
       sb.segmentIndex = 0
@@ -352,6 +318,7 @@ class MP4cut {
 
 
   addBuffer(mp4track) {
+    log('seg addbuffer() called')
     const track_id = mp4track.id
     const { codec } = mp4track
     const mime = `video/mp4; codecs="${codec}"`
@@ -378,12 +345,12 @@ class MP4cut {
   }
 
 
-  static updateBufferedString(sb, string) {
+  update_buffered_string(sb, string) {
     if (sb.ms.readyState === 'open') {
       const rangeString = Log.printRanges(sb.buffered)
       Log.info(`MSE - SourceBuffer #${sb.id}`,
                `${string}, updating: ${sb.updating},
-               currentTime: ${Log.getDurationString(video.currentTime, 1)},
+               currentTime: ${Log.getDurationString(this.mediaSource.video.currentTime, 1)},
                buffered: ${rangeString}, pending: ${sb.pendingAppends.length}`)
       if (sb.bufferTd === undefined) {
         // eslint-disable-next-line  no-param-reassign
@@ -393,17 +360,17 @@ class MP4cut {
   }
 
 
-  onInitAppended(e) {
+  on_init_appended(e) {
     const sb = e.target
     if (sb.ms.readyState === 'open') {
-      MP4cut.updateBufferedString(sb, 'Init segment append ended')
+      this.update_buffered_string(sb, 'Init segment append ended')
       sb.sampleNum = 0
-      sb.removeEventListener('updateend', () => this.onInitAppended())
+      sb.removeEventListener('updateend', () => this.on_init_appended())
       sb.addEventListener('updateend', () => this.on_update_end(sb, true, true))
       // In case there are already pending buffers we call on_update_end to start appending them
       this.on_update_end(sb, false, true)
       sb.ms.pendingInits -= 1
-      if (autoplay  &&  sb.ms.pendingInits === 0)
+      if (autoplay  &&  sb.ms.pendingInits === 0) // xxx
         this.mp4box.start()
     }
   }
@@ -413,7 +380,7 @@ class MP4cut {
   on_update_end(sb, isNotInit, isEndOfAppend) {
     if (isEndOfAppend === true) {
       if (isNotInit === true)
-        MP4cut.updateBufferedString(sb, 'Update ended')
+        this.update_buffered_string(sb, 'Update ended')
 
       if (sb.sampleNum) {
         this.mp4box.releaseUsedSamples(sb.id, sb.sampleNum)

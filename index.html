@@ -2,47 +2,49 @@
 <html>
   <head>
     <title>mp4cut.js -- JS/clientside based clipping of an .mp4 file - rewrites header and only (losslessly) sends desired A/V packets for the desired start/end range</title>
+
     <script src="//code.jquery.com/jquery-1.10.2.min.js"></script>
-    <script src="//download.tsi.telecom-paristech.fr/gpac/mp4box.js/mp4box.all.min.js"></script>
-    <script src="//download.tsi.telecom-paristech.fr/gpac/mp4box.js/downloader.js"></script>
+    <script src="//gpac.github.io/mp4box.js/dist/mp4box.all.js"></script>
+    <script src="//gpac.github.io/mp4box.js/test/downloader.js"></script>
     <!--
     <script src="../jquery-1.10.2.min.js"></script>
     <script src="../mp4box.js/dist/mp4box.all.js"></script>
     <script src="../mp4box.js/test/downloader.js"></script>
     -->
   </head>
-  <body style="max-width:600px; margin:auto">
-    <h2 style="text-align:center">mp4cut.js</h2>
-    <h2>JS & browser based playback & clipping of .mp4 files</h2>
-    <h3>Rewrites header and only (losslessly) sends desired A/V packets for the desired start/end range</h3>
-    <hr/>
+  <body style="max-width:650px; margin:auto">
+    <div style="column-width:300px">
+      <h2 style="text-align:center">mp4cut.js</h2>
+      <h2>JS & browser based playback & clipping of .mp4 files</h2>
+      <h3>Rewrites header and only (losslessly) sends desired A/V packets for the desired start/end range</h3>
+      <hr/>
 
-    Repo:
-    <a href="https://github.com/traceypooh/mp4cut.js">https://github.com/traceypooh/mp4cut.js</a>
-    <hr/>
+      Repo:
+      <a href="https://github.com/traceypooh/mp4cut.js">https://github.com/traceypooh/mp4cut.js</a>
+      <hr/>
 
-    Online demo:
-    <a href="https://traceypooh.github.io/mp4cut.js">https://traceypooh.github.io/mp4cut.js</a>
-    <hr/>
+      Online demo:
+      <a href="https://traceypooh.github.io/mp4cut.js">https://traceypooh.github.io/mp4cut.js</a>
+      <hr/>
 
-    Uses mp4/moov parsing JS from
-    <a href="http://download.tsi.telecom-paristech.fr/gpac/mp4box.js/">mp4box.js</a>
-    <hr/>
+      Uses mp4/moov parsing JS from
+      <a href="http://download.tsi.telecom-paristech.fr/gpac/mp4box.js/">mp4box.js</a>
+      <hr/>
 
-    Uses the Media Source Extensions (MSE) API<br/>
-    <a href="https://hacks.mozilla.org/2015/07/streaming-media-on-demand-with-media-source-extensions/">https://hacks.mozilla.org/2015/07/streaming-media-on-demand-with-media-source-extensions/</a><br/>
-    to inject video to this <code>&lt;video&gt;</code> tag:
-    <br/>
+      <video id="vxxx" controls autoplay width="100%" height="auto"></video>
+      <br/>
 
-    <video id="vxxx" controls autoplay width="100%" height="auto"></video>
-    <hr/>
+      Uses the Media Source Extensions (MSE) API<br/>
+      <a href="https://hacks.mozilla.org/2015/07/streaming-media-on-demand-with-media-source-extensions/">https://hacks.mozilla.org/2015/07/streaming-media-on-demand-with-media-source-extensions/</a><br/>
+      to inject video to this <code>&lt;video&gt;</code> tag
+      <hr/>
 
-    <i>
-      media files served locally need to be served using something like<br/>
-      <code>ruby -run -e httpd . -p 8000</code><br/>
-      for http RANGE requests, and the server need to support CORS options)
-    </i>
-
+      <i>
+        media files served locally need to be served using something like<br/>
+        <code>ruby -run -e httpd . -p 8888</code><br/>
+        for http RANGE requests, and the server need to support CORS options)
+      </i>
+    </div>
 
     <script src="mp4cut.js" type="module"></script>
   </body>
